@@ -1,7 +1,6 @@
 import os
 import time
 
-# Caminho padrão para o WSL (Windows Subsystem for Linux)
 WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
 
 def adjust_path(path):
@@ -17,9 +16,9 @@ def adjust_path(path):
     Returns:
         str: Caminho ajustado para WSL (se no Windows) ou o caminho original se for Linux.
     """
-    if os.name == 'nt':  # Verifica se está rodando no Windows
+    if os.name == 'nt':
         return os.path.join(WSL_PATH, path.lstrip('/').replace('/', '\\'))
-    return path  # Retorna o caminho original para sistemas não Windows
+    return path
 
 
 class SystemInfo:
