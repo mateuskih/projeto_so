@@ -1,0 +1,32 @@
+# Arquivos de ambiente virtual
+venv/
+env/
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+
+# Configurações do IDE
+.vscode/
+.idea/
+
+# Dependências
+*.egg-info/
+*.egg
+
+# Arquivos de log
+*.log
+
+# Arquivos de teste/resultado
+*.testresult
+*.coverage
+
+# Outros arquivos desnecessários
+*.swp
+*.bak
+*.tmp
