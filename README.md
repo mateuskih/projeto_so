@@ -20,19 +20,19 @@ Todos os requisitos abaixo devem ser obrigatoriamente obedecidos em ambos os pro
 Este objetivo consiste em implementar o primeiro conjunto de funcionalidades do Dashboard visando apresentar as informações sobre os processos que existem e estão executando no sistema operacional.
 
 **Os requisitos abaixo devem ser seguidos:**
-- [ ] Mostrar dados globais do uso do processador, p.ex. percentual de uso do processador, percentual de tempo ocioso, quantidade total de processos e threads, etc.
-- [ ] Mostrar a lista de processos existentes juntamente com os respectivos usuários;
-- [ ] Mostrar informações sobre os threads de cada processo;
-- [ ] Mostrar informações detalhadas de cada processo. Nesse caso, as informações podem ser apresentadas em uma nova tela (ou aba) que, ao ser fechada, retorna a tela principal.
+- [&check;] Mostrar dados globais do uso do processador, p.ex. percentual de uso do processador, percentual de tempo ocioso, quantidade total de processos e threads, etc.
+- [&check;] Mostrar a lista de processos existentes juntamente com os respectivos usuários;
+- [&check;] Mostrar informações sobre os threads de cada processo;
+- [&check;] Mostrar informações detalhadas de cada processo. Nesse caso, as informações podem ser apresentadas em uma nova tela (ou aba) que, ao ser fechada, retorna a tela principal.
 
 ### 2. Monitorar e apresentar as informações do uso de memória dos processos;
 
 Este objetivo consiste em fornecer as informações de uso de memória global do sistema e de cada processo individualmente. 
 
 **Os requisitos abaixo devem ser obrigatoriamente seguidos:**
-- [ ] Mostrar dados globais do uso de memória do sistema, p.ex. percentual de uso da memória, percentual de memória livre, quantidade de memória física (RAM) e virtual, etc.
-- [ ] Mostrar informações detalhadas sobre o uso de memória para cada processo, p.ex. quantidade total de memória alocada, quantidade de páginas de memória (total, de código, heap, stack), etc.
-- [ ] Ao mostrar informações detalhadas de cada processo, as informações podem ser apresentadas em uma nova tela (ou aba) que, ao ser fechada, retorna a tela principal.
+- [&check;] Mostrar dados globais do uso de memória do sistema, p.ex. percentual de uso da memória, percentual de memória livre, quantidade de memória física (RAM) e virtual, etc.
+- [&check;] Mostrar informações detalhadas sobre o uso de memória para cada processo, p.ex. quantidade total de memória alocada, quantidade de páginas de memória (total, de código, heap, stack), etc.
+- [&check;] Ao mostrar informações detalhadas de cada processo, as informações podem ser apresentadas em uma nova tela (ou aba) que, ao ser fechada, retorna a tela principal.
 
 ## PROJETO B - Mostrar dados do uso dos dispositivos de E/S pelos processos
 

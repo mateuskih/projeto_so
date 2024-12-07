@@ -2,28 +2,29 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 from models import SystemInfo, format_memory
+from .process_details import ProcessDetailsWindow
 from services import (
     buscaInformacoesCPU,
     buscaInfoMemoria,
     buscaProcessosAtivos,
     buscaInfoSO,
-    buscaDetalhesProcesso,
 )
 
 class DashboardApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Dashboard Sistemas Operacionais CSO30-S71 2024.2 - Mateus e Murilo")
-        self.geometry("900x768")  # Ajuste para um tamanho maior da janela
+        self.geometry("1024x900")  # Ajuste para um tamanho maior da janela
+        self.state('zoomed')
         self.dados = SystemInfo()
-        self.cpu_usage_history = [0] * 50  # Histórico de uso da CPU (50 pontos)
-        self.memory_used_history = [0] * 50  # Histórico de uso da memória (50 pontos)
+        self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU (27 pontos)
+        self.memory_used_history = [0] * 27  # Histórico de uso da memória (27 pontos)
         self.create_widgets()
         self.refresh_data()
 
     def create_widgets(self):
         # Canvas para rolagem
-        self.canvas = tk.Canvas(self, width=1024, height=768)  # Define dimensões iniciais maiores
+        self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
         # Barra de rolagem
@@ -39,9 +40,9 @@ class DashboardApp(tk.Tk):
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
         # Adicionar eventos para rolagem com o mouse
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
-        self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        # self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        # self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        # self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
 
         # Adicionar widgets ao frame rolável
         self.create_scrollable_content()
@@ -59,14 +60,20 @@ class DashboardApp(tk.Tk):
         main_frame = ttk.Frame(self.scrollable_frame, padding="10")
         main_frame.grid(row=0, column=0, sticky="nsew")
 
+        # OS Information
+        os_frame = ttk.LabelFrame(main_frame, text="Operating System Information", padding="10")
+        os_frame.grid(row=0, column=0, padx=10, pady=10, sticky="new")
+        self.os_info = ttk.Label(os_frame, text="", anchor="w", justify="left", padding="5")
+        self.os_info.grid(row=0, column=0, sticky="w")
+
         # CPU Information
         cpu_frame = ttk.LabelFrame(main_frame, text="CPU Information", padding="10")
-        cpu_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        cpu_frame.grid(row=1, column=0, padx=5, pady=10, sticky="w")
         self.cpu_info = ttk.Label(cpu_frame, text="", anchor="w", justify="left", padding="5")
         self.cpu_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de CPU
-        self.cpu_canvas = tk.Canvas(cpu_frame, width=800, height=150, bg="white")  # Gráfico maior
+        self.cpu_canvas = tk.Canvas(cpu_frame, width=400, height=150, bg="white") 
         self.cpu_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de CPU
@@ -78,12 +85,12 @@ class DashboardApp(tk.Tk):
 
         # Memory Information
         memory_frame = ttk.LabelFrame(main_frame, text="Memory Information", padding="10")
-        memory_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        memory_frame.grid(row=1, column=0, padx=5, pady=10, sticky="e")
         self.memory_info = ttk.Label(memory_frame, text="", anchor="w", justify="left", padding="5")
         self.memory_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de memória
-        self.memory_canvas = tk.Canvas(memory_frame, width=800, height=150, bg="white")  # Gráfico maior
+        self.memory_canvas = tk.Canvas(memory_frame, width=400, height=150, bg="white")  # Gráfico maior
         self.memory_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de memória
@@ -93,18 +100,13 @@ class DashboardApp(tk.Tk):
         self.memory_label_bottom = tk.Label(memory_frame, text="0", anchor="e")
         self.memory_label_bottom.grid(row=1, column=1, padx=5, sticky="s")
 
-        # Outras seções
-        os_frame = ttk.LabelFrame(main_frame, text="Operating System Information", padding="10")
-        os_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
-        self.os_info = ttk.Label(os_frame, text="", anchor="w", justify="left", padding="5")
-        self.os_info.grid(row=0, column=0, sticky="w")
-
+        # Canvas para os processos
         processes_frame = ttk.LabelFrame(main_frame, text="Active Processes", padding="10")
-        processes_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
+        processes_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
         processes_frame.rowconfigure(0, weight=1)
         processes_frame.columnconfigure(0, weight=1)
 
-        columns = ("user", "pid", "vsz", "rss", "command")
+        columns = ("user", "pid", "state", "vsz", "rss", "command")
         self.process_info = ttk.Treeview(processes_frame, columns=columns, show="headings", height=15)
         self.process_info.grid(row=0, column=0, sticky="nsew")
 
@@ -133,10 +135,15 @@ class DashboardApp(tk.Tk):
 
         # Atualização das informações de memória
         mem_used_percent = (self.dados.mUsada / self.dados.mtotal) * 100 if self.dados.mtotal > 0 else 0
+        mem_swap_used_percent = ((self.dados.swapTotal - self.dados.swapFree) / self.dados.swapTotal) * 100 if self.dados.swapTotal > 0 else 0
         self.memory_info.config(text=(
             f"Total: {self.dados.mtotal // 1024} MB\n"
             f"Used: {self.dados.mUsada // 1024} MB ({mem_used_percent:.2f}%)\n"
-            f"Free: {self.dados.mLivre // 1024} MB"
+            f"Free: {self.dados.mLivre // 1024} MB ({100 - mem_used_percent:.2f}%)\n\n"
+            
+            f"Swap Total: {self.dados.swapTotal // 1024} MB\n"
+            f"Swap Used: {(self.dados.swapTotal - self.dados.swapFree) // 1024} MB ({mem_swap_used_percent:.2f}%)\n"
+            f"Swap Free: {self.dados.swapFree // 1024} MB ({100 - mem_swap_used_percent:.2f}%)"
         ))
 
         # Atualização do SO
@@ -175,55 +182,36 @@ class DashboardApp(tk.Tk):
             x2 = i * 16
             y2 = 150 - (self.memory_used_history[i] / max_value * 150)
             self.memory_canvas.create_line(x1, y1, x2, y2, fill="green", width=2)
-
-    def refresh_data(self):
-        threading.Thread(target=self.fetch_data).start()
-
+        
     def fetch_data(self):
+        # Busca todas as informações necessárias
         buscaInformacoesCPU(self.dados)
         buscaInfoMemoria(self.dados)
         buscaInfoSO(self.dados)
         buscaProcessosAtivos(self.dados)
-        self.update_display()
-        self.after(1000, self.refresh_data)
+        self.data_ready = True  # Sinaliza que os dados estão prontos
 
+    def refresh_data(self):
+        # Inicia uma thread para buscar os dados
+        thread = threading.Thread(target=self.fetch_data, daemon=True)
+        thread.start()
+
+        # Em vez de bloquear com join(), verificamos se a thread terminou
+        self.after(100, self.check_data_ready)
+        
+    def check_data_ready(self):
+        if hasattr(self, 'data_ready') and self.data_ready:
+            # Atualiza a interface quando os dados estiverem prontos
+            self.update_display()
+            self.data_ready = False  # Reseta a flag para a próxima atualização
+            self.after(1000, self.refresh_data)  # Agende a próxima atualização após 1 segundo
+        else:
+            # Continue verificando se os dados estão prontos
+            self.after(100, self.check_data_ready)
+        
     def show_process_details(self, event):
         selection = self.process_info.selection()
         if selection:
             selected_item = self.process_info.item(selection[0])
             pid = selected_item['values'][1]
             ProcessDetailsWindow(self, pid)
-
-class ProcessDetailsWindow(tk.Toplevel):
-    def __init__(self, parent, pid):
-        super().__init__(parent)
-        self.title(f"Details for PID {pid}")
-        self.geometry("600x400")
-        self.pid = pid
-
-        self.details_label = ttk.Label(self, text=f"Details for Process {pid}:", font=("Arial", 12, "bold"))
-        self.details_label.pack(anchor="w", padx=10, pady=5)
-
-        # Text widget for displaying process details, set to not editable
-        self.details_text = tk.Text(self, wrap="word", state="disabled")  # Start with disabled state
-        self.details_text.pack(fill="both", expand=True, padx=10, pady=5)
-
-        self.fetch_details()
-
-    def fetch_details(self):
-        details = buscaDetalhesProcesso(self.pid)
-        useful_keys = ["Name", "State", "Pid", "PPid", "Threads", "VmSize", "VmRSS", "User"]
-
-        # Temporarily enable the text widget to update its content
-        self.details_text.config(state="normal")
-        self.details_text.delete("1.0", tk.END)  # Clear existing content
-
-        for key in useful_keys:
-            if key in details:
-                value = details[key]
-                if key in ["VmSize", "VmRSS"]:
-                    value = format_memory(int(value.split()[0]))
-                self.details_text.insert(tk.END, f"{key}: {value}\n")
-
-        # Disable the text widget to prevent editing
-        self.details_text.config(state="disabled")

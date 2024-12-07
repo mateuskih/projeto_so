@@ -1,1 +1,1 @@
-from .views import DashboardApp, ProcessDetailsWindow
+from .dashboard import DashboardApp

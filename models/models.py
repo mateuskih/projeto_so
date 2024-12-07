@@ -1,7 +1,7 @@
 import os
 import time
 
-WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
+WSL_PATH = r"\\wsl.localhost\Ubuntu-22.04"
 
 def adjust_path(path):
     """
