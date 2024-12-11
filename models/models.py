@@ -1,7 +1,8 @@
 import os
-import time
+import traceback
 
-WSL_PATH = r"\\wsl.localhost\Ubuntu-22.04"
+
+WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
 
 def adjust_path(path):
     """
@@ -86,11 +87,13 @@ def get_username_from_uid(uid):
         str: Nome do usuário correspondente ao UID, ou "unknown" se não encontrado.
     """
     try:
-        with open(adjust_path("/etc/passwd"), "r") as f:
+        path = adjust_path("/etc/passwd")
+        with open(path, "r") as f:
             for line in f:
                 parts = line.split(":")
                 if parts[2] == str(uid):
                     return parts[0]
-    except FileNotFoundError:
-        pass
+    except Exception:
+        print(f"Model - get_username_from_uid: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
     return "unknown"

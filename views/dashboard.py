@@ -1,17 +1,26 @@
 import tkinter as tk
 from tkinter import ttk
 import threading
+import traceback
 from models import SystemInfo, format_memory
 from .process_details import ProcessDetailsWindow
 from services import (
-    buscaInformacoesCPU,
-    buscaInfoMemoria,
-    buscaProcessosAtivos,
-    buscaInfoSO,
+    fetch_cpu_info,
+    fetch_memory_info,
+    fetch_active_processes,
+    fetch_os_info,
 )
 
 class DashboardApp(tk.Tk):
+    """
+    Classe principal para a aplicação de dashboard.
+
+    Esta aplicação exibe informações sobre o sistema operacional, CPU, memória, e processos ativos.
+    """
     def __init__(self):
+        """
+        Inicializa a aplicação de dashboard.
+        """
         super().__init__()
         self.title("Dashboard Sistemas Operacionais CSO30-S71 2024.2 - Mateus e Murilo")
         self.geometry("1024x900")  # Ajuste para um tamanho maior da janela
@@ -19,34 +28,42 @@ class DashboardApp(tk.Tk):
         self.dados = SystemInfo()
         self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU (27 pontos)
         self.memory_used_history = [0] * 27  # Histórico de uso da memória (27 pontos)
-        self.create_widgets()
-        self.refresh_data()
-
+        try:
+            self.create_widgets()
+            self.refresh_data()
+        except Exception:
+            print("Dashboard - __init__: Erro ao inicializar a aplicação")
+            traceback.print_exc()
     def create_widgets(self):
-        # Canvas para rolagem
-        self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
-        self.canvas.grid(row=0, column=0, sticky="nsew")
+        """
+        Cria os widgets da interface gráfica.
 
-        # Barra de rolagem
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        Este método configura a estrutura principal da interface, incluindo canvas, barras de rolagem, e frames para exibição de dados.
+        """
+        try:
+            # Canvas para rolagem
+            self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
+            self.canvas.grid(row=0, column=0, sticky="nsew")
 
-        # Frame que conterá todo o conteúdo
-        self.scrollable_frame = ttk.Frame(self.canvas)
-        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+            # Barra de rolagem
+            scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+            scrollbar.grid(row=0, column=1, sticky="ns")
+            self.canvas.configure(yscrollcommand=scrollbar.set)
 
-        # Adicionar o frame ao canvas
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+            # Frame que conterá todo o conteúdo
+            self.scrollable_frame = ttk.Frame(self.canvas)
+            self.scrollable_frame.bind(
+                "<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+            )
 
-        # Adicionar eventos para rolagem com o mouse
-        # self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        # self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
-        # self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+            # Adicionar o frame ao canvas
+            self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
-        # Adicionar widgets ao frame rolável
-        self.create_scrollable_content()
-
+            # Adicionar widgets ao frame rolável
+            self.create_scrollable_content()
+        except Exception:
+            print("Dashboard - create_widgets: Erro ao criar widgets")
+            traceback.print_exc()
     def _on_mousewheel(self, event):
         """Handler para rolagem com o mouse."""
         if event.num == 4:  # Sistemas Unix (Scroll para cima)
@@ -57,6 +74,11 @@ class DashboardApp(tk.Tk):
             self.canvas.yview_scroll(-1 * int(event.delta / 120), "units")
 
     def create_scrollable_content(self):
+        """
+        Adiciona o conteúdo ao frame rolável.
+
+        Este método cria frames para exibir informações do sistema, CPU, memória e processos ativos.
+        """
         main_frame = ttk.Frame(self.scrollable_frame, padding="10")
         main_frame.grid(row=0, column=0, sticky="nsew")
 
@@ -122,6 +144,47 @@ class DashboardApp(tk.Tk):
 
 
     def update_display(self):
+        """
+        Atualiza as informações exibidas na interface.
+
+        Este método atualiza as informações da CPU, memória, SO e os processos ativos exibidos na interface gráfica.
+        """
+        try:
+            # Atualização das informações de CPU
+            self.cpu_info.config(text=(
+                f"Name: {self.dados.cpu_name}\n"
+                f"Cores: {self.dados.quantidadeCPU}\n"
+                f"Frequency: {self.dados.cpu_ghz} GHz\n"
+                f"Usage: {self.dados.cpu_usage}%\n"
+                f"Idle: {self.dados.idle_percent}%\n"
+                f"Processes: {self.dados.total_processos}\n"
+                f"Threads: {self.dados.total_threads}"
+            ))
+
+            # Atualização das informações de memória
+            mem_used_percent = (self.dados.mUsada / self.dados.mtotal) * 100 if self.dados.mtotal > 0 else 0
+            mem_swap_used_percent = ((self.dados.swapTotal - self.dados.swapFree) / self.dados.swapTotal) * 100 if self.dados.swapTotal > 0 else 0
+            self.memory_info.config(text=(
+                f"Total: {self.dados.mtotal // 1024} MB\n"
+                f"Used: {self.dados.mUsada // 1024} MB ({mem_used_percent:.2f}%)\n"
+                f"Free: {self.dados.mLivre // 1024} MB ({100 - mem_used_percent:.2f}%)\n\n"
+                f"Swap Total: {self.dados.swapTotal // 1024} MB\n"
+                f"Swap Used: {(self.dados.swapTotal - self.dados.swapFree) // 1024} MB ({mem_swap_used_percent:.2f}%)\n"
+                f"Swap Free: {self.dados.swapFree // 1024} MB ({100 - mem_swap_used_percent:.2f}%)"
+            ))
+
+            # Atualização do Treeview
+            for row in self.process_info.get_children():
+                self.process_info.delete(row)
+            for process in self.dados.processosAtivos:
+                self.process_info.insert("", "end", values=process)
+
+            # Atualização dos gráficos
+            self.update_cpu_graph()
+            self.update_memory_graph()
+        except Exception:
+            print("Dashboard - update_display: Erro ao atualizar a exibição")
+            traceback.print_exc()
         # Atualização das informações de CPU
         self.cpu_info.config(text=(
             f"Name: {self.dados.cpu_name}\n"
@@ -160,6 +223,11 @@ class DashboardApp(tk.Tk):
         self.update_memory_graph()
 
     def update_cpu_graph(self):
+        """
+        Atualiza o gráfico de uso da CPU.
+
+        Este método desenha um gráfico que representa o uso da CPU ao longo do tempo.
+        """
         self.cpu_usage_history.pop(0)
         self.cpu_usage_history.append(self.dados.cpu_usage)
         self.cpu_canvas.delete("all")
@@ -172,6 +240,11 @@ class DashboardApp(tk.Tk):
             self.cpu_canvas.create_line(x1, y1, x2, y2, fill="blue", width=2)
 
     def update_memory_graph(self):
+        """
+        Atualiza o gráfico de uso da memória.
+
+        Este método desenha um gráfico que representa o uso da memória ao longo do tempo.
+        """
         self.memory_used_history.pop(0)
         self.memory_used_history.append(self.dados.mUsada / 1024)  # Convertendo para MB
         self.memory_canvas.delete("all")
@@ -184,34 +257,68 @@ class DashboardApp(tk.Tk):
             self.memory_canvas.create_line(x1, y1, x2, y2, fill="green", width=2)
         
     def fetch_data(self):
-        # Busca todas as informações necessárias
-        buscaInformacoesCPU(self.dados)
-        buscaInfoMemoria(self.dados)
-        buscaInfoSO(self.dados)
-        buscaProcessosAtivos(self.dados)
-        self.data_ready = True  # Sinaliza que os dados estão prontos
+        """
+        Busca as informações do sistema.
 
+        Este método coleta informações da CPU, memória, sistema operacional e processos ativos.
+        """
+        try:
+            # Busca todas as informações necessárias
+            fetch_cpu_info(self.dados)
+            fetch_memory_info(self.dados)
+            fetch_os_info(self.dados)
+            fetch_active_processes(self.dados)
+            self.data_ready = True  # Sinaliza que os dados estão prontos
+        except Exception:
+            print("Dashboard - fetch_data: Erro ao buscar dados do sistema")
+            traceback.print_exc()
     def refresh_data(self):
-        # Inicia uma thread para buscar os dados
-        thread = threading.Thread(target=self.fetch_data, daemon=True)
-        thread.start()
+        """
+        Atualiza os dados periodicamente.
 
-        # Em vez de bloquear com join(), verificamos se a thread terminou
-        self.after(100, self.check_data_ready)
-        
-    def check_data_ready(self):
-        if hasattr(self, 'data_ready') and self.data_ready:
-            # Atualiza a interface quando os dados estiverem prontos
-            self.update_display()
-            self.data_ready = False  # Reseta a flag para a próxima atualização
-            self.after(1000, self.refresh_data)  # Agende a próxima atualização após 1 segundo
-        else:
-            # Continue verificando se os dados estão prontos
+        Este método inicia uma thread para buscar os dados e verifica regularmente o estado da coleta.
+        """
+        try:
+            # Inicia uma thread para buscar os dados
+            thread = threading.Thread(target=self.fetch_data, daemon=True)
+            thread.start()
+
+            # Em vez de bloquear com join(), verificamos se a thread terminou
             self.after(100, self.check_data_ready)
+        except Exception:
+            print("Dashboard - refresh_data: Erro ao iniciar o refresh de dados")
+            traceback.print_exc()  
+    def check_data_ready(self):
+        """
+        Verifica se os dados foram coletados.
+
+        Este método verifica regularmente se os dados estão prontos e, se estiverem, atualiza a interface.
+        """
+        try:
+            if hasattr(self, 'data_ready') and self.data_ready:
+                # Atualiza a interface quando os dados estiverem prontos
+                self.update_display()
+                self.data_ready = False  # Reseta a flag para a próxima atualização
+                self.after(1000, self.refresh_data)  # Agende a próxima atualização após 1 segundo
+            else:
+                # Continue verificando se os dados estão prontos
+                self.after(100, self.check_data_ready)
+        except Exception:
+            print("Dashboard - check_data_ready: Erro ao verificar se os dados estão prontos")
+            traceback.print_exc()
         
     def show_process_details(self, event):
-        selection = self.process_info.selection()
-        if selection:
-            selected_item = self.process_info.item(selection[0])
-            pid = selected_item['values'][1]
-            ProcessDetailsWindow(self, pid)
+        """
+        Exibe os detalhes do processo selecionado.
+
+        Este método abre uma nova janela com informações detalhadas do processo selecionado no TreeView.
+        """
+        try:
+            selection = self.process_info.selection()
+            if selection:
+                selected_item = self.process_info.item(selection[0])
+                pid = selected_item['values'][1]
+                ProcessDetailsWindow(self, pid)
+        except Exception:
+            print("Dashboard - show_process_details: Erro ao exibir detalhes do processo")
+            traceback.print_exc()

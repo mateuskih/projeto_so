@@ -1,9 +1,10 @@
 import os
 import time
+import traceback
 from models import adjust_path, format_memory, get_username_from_uid
 
 # Função para buscar informações sobre o CPU
-def buscaInformacoesCPU(dados):
+def fetch_cpu_info(dados):
     """
     Coleta informações detalhadas do CPU, incluindo:
     - Quantidade de núcleos
@@ -83,7 +84,7 @@ def buscaInformacoesCPU(dados):
         dados.total_processos = total_processos
         dados.total_threads = total_threads
 
-    except FileNotFoundError:
+    except Exception:
         # Define valores padrão em caso de erro
         dados.cpu_name = "Unknown"
         dados.cpu_ghz = 0.0
@@ -91,9 +92,11 @@ def buscaInformacoesCPU(dados):
         dados.idle_percent = 0.0
         dados.total_processos = 0
         dados.total_threads = 0
+        print(f"Service - fetch_cpu_info: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
 
 # Função para buscar informações de memória
-def buscaInfoMemoria(dados):
+def fetch_memory_info(dados):
     """
     Coleta informações sobre a memória do sistema, incluindo:
     - Total de memória
@@ -121,11 +124,12 @@ def buscaInfoMemoria(dados):
         dados.swapTotal = meminfo.get("SwapTotal", 0)
         dados.swapFree = meminfo.get("SwapFree", 0)
         dados.mUsada = dados.mtotal - dados.mLivre - dados.buffers
-    except FileNotFoundError:
-        pass
+    except Exception:
+        print(f"Service - fetch_memory_info: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
 
 # Função para buscar processos ativos
-def buscaProcessosAtivos(dados):
+def fetch_active_processes(dados):
     """
     Coleta informações sobre os processos ativos no sistema, incluindo:
     - Usuário que iniciou o processo
@@ -168,11 +172,13 @@ def buscaProcessosAtivos(dados):
                 except (FileNotFoundError, KeyError):
                     continue
         dados.processosAtivos = processos
-    except FileNotFoundError:
+    except Exception:
         dados.processosAtivos = []
+        print(f"Service - fetch_active_processes: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
 
 # Função para buscar informações do sistema operacional
-def buscaInfoSO(dados):
+def fetch_os_info(dados):
     """
     Coleta informações sobre o sistema operacional, incluindo:
     - Versão do kernel
@@ -195,11 +201,13 @@ def buscaInfoSO(dados):
             architecture = f.readline().strip()
 
         dados.infoSO = f"Kernel: {kernel_info}\nHostname: {hostname}\nArchitecture: {architecture}"
-    except FileNotFoundError:
+    except Exception:
         dados.infoSO = "Unknown OS"
+        print(f"Service - fetch_os_info: Erro ao abrir arquivos {path} {hostname_path} {architecture_path}")
+        traceback.print_exc()
 
 # Função para buscar detalhes de um processo específico
-def buscaDetalhesProcesso(pid):
+def fetch_process_details(pid):
     """
     Coleta detalhes sobre um processo específico com base no seu PID.
 
@@ -219,6 +227,9 @@ def buscaDetalhesProcesso(pid):
         if "Uid" in details:
             uid = details["Uid"].split()[0]
             details["User"] = get_username_from_uid(uid)
+
+        return details
     except (FileNotFoundError, KeyError):
         details["Error"] = f"Process {pid} not found."
-    return details
+        print(f"Service - fetch_process_details: Erro ao abrir arquivo {status_path}")
+        traceback.print_exc()
