@@ -2,10 +2,11 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import traceback
-from models import SystemInfo, format_memory
+from models import SystemInfo
 from services import (
     fetch_process_details,
 )
+from services.system_info_service import format_memory
 
 
 class ProcessDetailsWindow(tk.Toplevel):

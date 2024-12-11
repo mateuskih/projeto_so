@@ -1,7 +1,8 @@
 import os
 import time
 import traceback
-from models import adjust_path, format_memory, get_username_from_uid
+
+WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
 
 def fetch_cpu_info(dados):
     """
@@ -30,7 +31,7 @@ def fetch_cpu_info(dados):
         dados.idle_percent = 0.0
         dados.total_processos = 0
         dados.total_threads = 0
-        print(f"Service - fetch_cpu_info: Erro ao abrir arquivo /proc/cpuinfo")
+        print(f"system_info_service - fetch_cpu_info: Erro ao abrir arquivo /proc/cpuinfo")
         traceback.print_exc()
 
 def fetch_memory_info(dados):
@@ -51,7 +52,7 @@ def fetch_memory_info(dados):
         meminfo = _read_memory_info()
         _store_memory_info(dados, meminfo)
     except Exception:
-        print(f"Service - fetch_memory_info: Erro ao abrir arquivo /proc/meminfo")
+        print(f"system_info_service - fetch_memory_info: Erro ao abrir arquivo /proc/meminfo")
         traceback.print_exc()
 
 
@@ -74,7 +75,7 @@ def fetch_active_processes(dados):
         dados.processosAtivos = processos
     except Exception:
         dados.processosAtivos = []
-        print(f"Service - fetch_active_processes: Erro ao abrir arquivo /proc")
+        print(f"system_info_service - fetch_active_processes: Erro ao abrir arquivo /proc")
         traceback.print_exc()
 
 def fetch_os_info(dados):
@@ -95,7 +96,7 @@ def fetch_os_info(dados):
         dados.infoSO = f"Kernel: {kernel_info.strip()}\nHostname: {hostname.strip()}\nArchitecture: {architecture.strip()}"
     except Exception:
         dados.infoSO = "Unknown OS"
-        print(f"Service - fetch_os_info: Erro ao abrir arquivos /proc/version /proc/sys/kernel/hostname /proc/sys/kernel/osrelease")
+        print(f"system_info_service - fetch_os_info: Erro ao abrir arquivos /proc/version /proc/sys/kernel/hostname /proc/sys/kernel/osrelease")
         traceback.print_exc()
 
 def fetch_process_details(pid):
@@ -353,3 +354,58 @@ def _parse_process_details(status, user):
         key, *value = line.split(":")
         details[key.strip()] = ":".join(value).strip()
     return details
+
+def adjust_path(path):
+    """
+    Ajusta o caminho para redirecionar para o WSL, se necessário.
+
+    Caso esteja rodando no Windows, modifica o caminho para seguir o formato usado pelo WSL.
+    Caso contrário, retorna o caminho original para o Linux.
+
+    Args:
+        path (str): Caminho original a ser ajustado.
+
+    Returns:
+        str: Caminho ajustado para WSL (se no Windows) ou o caminho original se for Linux.
+    """
+    if os.name == 'nt':
+        return os.path.join(WSL_PATH, path.lstrip('/').replace('/', '\\'))
+    return path
+
+def format_memory(size_kb):
+    """
+    Formata o tamanho da memória em MB ou KB, com duas casas decimais.
+
+    Args:
+        size_kb (int): Tamanho da memória em KB.
+
+    Returns:
+        str: Tamanho formatado como MB (se maior ou igual a 1024 KB) ou KB.
+    """
+    return f"{size_kb / 1024:.2f} MB" if size_kb >= 1024 else f"{size_kb:.2f} KB"
+
+
+def get_username_from_uid(uid):
+    """
+    Obtém o nome do usuário correspondente a um UID lendo o arquivo /etc/passwd.
+
+    No Linux e sistemas baseados em Unix, o arquivo /etc/passwd contém informações sobre usuários.
+    Esta função busca o nome de usuário associado a um determinado UID.
+
+    Args:
+        uid (str): UID do usuário a ser buscado.
+
+    Returns:
+        str: Nome do usuário correspondente ao UID, ou "unknown" se não encontrado.
+    """
+    try:
+        path = adjust_path("/etc/passwd")
+        with open(path, "r") as f:
+            for line in f:
+                parts = line.split(":")
+                if parts[2] == str(uid):
+                    return parts[0]
+    except Exception:
+        print(f"system_info_service - get_username_from_uid: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
+    return "unknown"

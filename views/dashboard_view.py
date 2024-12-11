@@ -2,14 +2,9 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import traceback
-from models import SystemInfo, format_memory
-from .process_details import ProcessDetailsWindow
-from services import (
-    fetch_cpu_info,
-    fetch_memory_info,
-    fetch_active_processes,
-    fetch_os_info,
-)
+from models.system_info_model import SystemInfo
+from services.system_info_service import fetch_active_processes, fetch_cpu_info, fetch_memory_info, fetch_os_info
+from .process_details_view import ProcessDetailsWindow
 
 class DashboardApp(tk.Tk):
     """
@@ -34,36 +29,37 @@ class DashboardApp(tk.Tk):
         except Exception:
             print("Dashboard - __init__: Erro ao inicializar a aplicação")
             traceback.print_exc()
+
     def create_widgets(self):
         """
         Cria os widgets da interface gráfica.
 
         Este método configura a estrutura principal da interface, incluindo canvas, barras de rolagem, e frames para exibição de dados.
         """
-        try:
-            # Canvas para rolagem
-            self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
-            self.canvas.grid(row=0, column=0, sticky="nsew")
+        # Canvas para rolagem
+        self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
+        self.canvas.grid(row=0, column=0, sticky="nsew")
 
-            # Barra de rolagem
-            scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-            scrollbar.grid(row=0, column=1, sticky="ns")
-            self.canvas.configure(yscrollcommand=scrollbar.set)
+        # Barra de rolagem
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
 
-            # Frame que conterá todo o conteúdo
-            self.scrollable_frame = ttk.Frame(self.canvas)
-            self.scrollable_frame.bind(
-                "<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-            )
+        # Frame que conterá todo o conteúdo
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
-            # Adicionar o frame ao canvas
-            self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        # Adicionar o frame ao canvas
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
-            # Adicionar widgets ao frame rolável
-            self.create_scrollable_content()
-        except Exception:
-            print("Dashboard - create_widgets: Erro ao criar widgets")
-            traceback.print_exc()
+        # Adicionar eventos para rolagem com o mouse
+        # self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        # self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        # self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+
+        # Adicionar widgets ao frame rolável
+        self.create_scrollable_content()
+
     def _on_mousewheel(self, event):
         """Handler para rolagem com o mouse."""
         if event.num == 4:  # Sistemas Unix (Scroll para cima)
@@ -79,6 +75,7 @@ class DashboardApp(tk.Tk):
 
         Este método cria frames para exibir informações do sistema, CPU, memória e processos ativos.
         """
+
         main_frame = ttk.Frame(self.scrollable_frame, padding="10")
         main_frame.grid(row=0, column=0, sticky="nsew")
 
@@ -99,7 +96,7 @@ class DashboardApp(tk.Tk):
         self.cpu_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de CPU
-        self.cpu_label_top = tk.Label(cpu_frame, text="100", anchor="e")
+        self.cpu_label_top = tk.Label(cpu_frame, text="100%", anchor="e")
         self.cpu_label_top.grid(row=1, column=1, padx=5, sticky="n")
 
         self.cpu_label_bottom = tk.Label(cpu_frame, text="0", anchor="e")
@@ -116,7 +113,7 @@ class DashboardApp(tk.Tk):
         self.memory_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de memória
-        self.memory_label_top = tk.Label(memory_frame, text="100", anchor="e")
+        self.memory_label_top = tk.Label(memory_frame, text="100%", anchor="e")
         self.memory_label_top.grid(row=1, column=1, padx=5, sticky="n")
 
         self.memory_label_bottom = tk.Label(memory_frame, text="0", anchor="e")
@@ -149,42 +146,6 @@ class DashboardApp(tk.Tk):
 
         Este método atualiza as informações da CPU, memória, SO e os processos ativos exibidos na interface gráfica.
         """
-        try:
-            # Atualização das informações de CPU
-            self.cpu_info.config(text=(
-                f"Name: {self.dados.cpu_name}\n"
-                f"Cores: {self.dados.quantidadeCPU}\n"
-                f"Frequency: {self.dados.cpu_ghz} GHz\n"
-                f"Usage: {self.dados.cpu_usage}%\n"
-                f"Idle: {self.dados.idle_percent}%\n"
-                f"Processes: {self.dados.total_processos}\n"
-                f"Threads: {self.dados.total_threads}"
-            ))
-
-            # Atualização das informações de memória
-            mem_used_percent = (self.dados.mUsada / self.dados.mtotal) * 100 if self.dados.mtotal > 0 else 0
-            mem_swap_used_percent = ((self.dados.swapTotal - self.dados.swapFree) / self.dados.swapTotal) * 100 if self.dados.swapTotal > 0 else 0
-            self.memory_info.config(text=(
-                f"Total: {self.dados.mtotal // 1024} MB\n"
-                f"Used: {self.dados.mUsada // 1024} MB ({mem_used_percent:.2f}%)\n"
-                f"Free: {self.dados.mLivre // 1024} MB ({100 - mem_used_percent:.2f}%)\n\n"
-                f"Swap Total: {self.dados.swapTotal // 1024} MB\n"
-                f"Swap Used: {(self.dados.swapTotal - self.dados.swapFree) // 1024} MB ({mem_swap_used_percent:.2f}%)\n"
-                f"Swap Free: {self.dados.swapFree // 1024} MB ({100 - mem_swap_used_percent:.2f}%)"
-            ))
-
-            # Atualização do Treeview
-            for row in self.process_info.get_children():
-                self.process_info.delete(row)
-            for process in self.dados.processosAtivos:
-                self.process_info.insert("", "end", values=process)
-
-            # Atualização dos gráficos
-            self.update_cpu_graph()
-            self.update_memory_graph()
-        except Exception:
-            print("Dashboard - update_display: Erro ao atualizar a exibição")
-            traceback.print_exc()
         # Atualização das informações de CPU
         self.cpu_info.config(text=(
             f"Name: {self.dados.cpu_name}\n"
