@@ -18,8 +18,7 @@ class DashboardApp(tk.Tk):
         """
         super().__init__()
         self.title("Dashboard Sistemas Operacionais CSO30-S71 2024.2 - Mateus e Murilo")
-        self.geometry("1024x900")  # Ajuste para um tamanho maior da janela
-        self.state('zoomed')
+        self.geometry("600x600")  # Ajuste para um tamanho inicial
         self.dados = SystemInfo()
         self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU (27 pontos)
         self.memory_used_history = [0] * 27  # Histórico de uso da memória (27 pontos)
@@ -36,14 +35,23 @@ class DashboardApp(tk.Tk):
 
         Este método configura a estrutura principal da interface, incluindo canvas, barras de rolagem, e frames para exibição de dados.
         """
+        # Frame principal com grid para expandir a janela
+        main_frame = ttk.Frame(self)
+        main_frame.grid(row=0, column=0, sticky="nsew")
+
         # Canvas para rolagem
-        self.canvas = tk.Canvas(self, width=1024, height=900)  # Define dimensões iniciais maiores
+        self.canvas = tk.Canvas(main_frame)
         self.canvas.grid(row=0, column=0, sticky="nsew")
 
-        # Barra de rolagem
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
+        # Barra de rolagem vertical
+        scrollbar_y = ttk.Scrollbar(main_frame, orient="vertical", command=self.canvas.yview)
+        scrollbar_y.grid(row=0, column=1, sticky="ns")
+        self.canvas.configure(yscrollcommand=scrollbar_y.set)
+
+        # Barra de rolagem horizontal
+        scrollbar_x = ttk.Scrollbar(main_frame, orient="horizontal", command=self.canvas.xview)
+        scrollbar_x.grid(row=1, column=0, sticky="ew")
+        self.canvas.configure(xscrollcommand=scrollbar_x.set)
 
         # Frame que conterá todo o conteúdo
         self.scrollable_frame = ttk.Frame(self.canvas)
@@ -53,12 +61,20 @@ class DashboardApp(tk.Tk):
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
         # Adicionar eventos para rolagem com o mouse
-        # self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        # self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
-        # self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
 
         # Adicionar widgets ao frame rolável
         self.create_scrollable_content()
+
+        # Configure a expansão do grid para todo o tamanho
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(0, weight=1)
+
+        # Garantir que o Canvas preencha toda a janela
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
     def _on_mousewheel(self, event):
         """Handler para rolagem com o mouse."""
@@ -92,7 +108,7 @@ class DashboardApp(tk.Tk):
         self.cpu_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de CPU
-        self.cpu_canvas = tk.Canvas(cpu_frame, width=400, height=150, bg="white") 
+        self.cpu_canvas = tk.Canvas(cpu_frame, width=600, height=150, bg="white")  # Gráfico de CPU maior
         self.cpu_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de CPU
@@ -109,7 +125,7 @@ class DashboardApp(tk.Tk):
         self.memory_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de memória
-        self.memory_canvas = tk.Canvas(memory_frame, width=400, height=150, bg="white")  # Gráfico maior
+        self.memory_canvas = tk.Canvas(memory_frame, width=600, height=150, bg="white")  # Gráfico maior
         self.memory_canvas.grid(row=1, column=0, pady=5)
 
         # Adicionando legendas ao gráfico de memória
@@ -233,6 +249,7 @@ class DashboardApp(tk.Tk):
         except Exception:
             print("Dashboard - fetch_data: Erro ao buscar dados do sistema")
             traceback.print_exc()
+
     def refresh_data(self):
         """
         Atualiza os dados periodicamente.
@@ -245,10 +262,11 @@ class DashboardApp(tk.Tk):
             thread.start()
 
             # Em vez de bloquear com join(), verificamos se a thread terminou
-            self.after(100, self.check_data_ready)
+            self.after(1000, self.check_data_ready)
         except Exception:
             print("Dashboard - refresh_data: Erro ao iniciar o refresh de dados")
             traceback.print_exc()  
+
     def check_data_ready(self):
         """
         Verifica se os dados foram coletados.
@@ -263,7 +281,7 @@ class DashboardApp(tk.Tk):
                 self.after(1000, self.refresh_data)  # Agende a próxima atualização após 1 segundo
             else:
                 # Continue verificando se os dados estão prontos
-                self.after(100, self.check_data_ready)
+                self.after(1000, self.check_data_ready)
         except Exception:
             print("Dashboard - check_data_ready: Erro ao verificar se os dados estão prontos")
             traceback.print_exc()

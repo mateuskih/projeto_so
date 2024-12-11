@@ -101,7 +101,7 @@ class ProcessDetailsWindow(tk.Toplevel):
             thread.start()
 
             # Programa verificações regulares do estado da thread
-            self.after(100, self.check_data_ready)
+            self.after(1000, self.check_data_ready)
         except Exception:
             print(f"ProcessDetailsWindow - refresh_data: Erro ao iniciar o refresh de dados para PID {self.pid}")
             traceback.print_exc()
@@ -119,7 +119,7 @@ class ProcessDetailsWindow(tk.Toplevel):
                 self.after(1000, self.refresh_data)  # Programa a próxima atualização
             else:
                 # Continua verificando se os dados estão prontos
-                self.after(100, self.check_data_ready)
+                self.after(1000, self.check_data_ready)
         except Exception:
             print(f"ProcessDetailsWindow - check_data_ready: Erro ao verificar se os dados estão prontos para PID {self.pid}")
             traceback.print_exc()

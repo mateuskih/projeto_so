@@ -224,13 +224,17 @@ def _read_memory_info():
     Retorno:
         dict: Dicionário contendo as informações de memória.
     """
-    path = adjust_path("/proc/meminfo")
-    meminfo = {}
-    with open(path, "r") as f:
-        for line in f:
-            key, value = line.split(":")
-            meminfo[key.strip()] = int(value.split()[0])
-    return meminfo
+    try:
+        path = adjust_path("/proc/meminfo")
+        meminfo = {}
+        with open(path, "r") as f:
+            for line in f:
+                key, value = line.split(":")
+                meminfo[key.strip()] = int(value.split()[0])
+        return meminfo
+    except Exception:
+        print(f"system_info_service - get_username_from_uid: Erro ao abrir arquivo {path}")
+        traceback.print_exc()
 
 def _store_memory_info(dados, meminfo):
     """
