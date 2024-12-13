@@ -5,6 +5,7 @@ import traceback
 from models.system_info_model import SystemInfo
 from services.system_info_service import fetch_active_processes, fetch_cpu_info, fetch_memory_info, fetch_os_info
 from .process_details_view import ProcessDetailsWindow
+from concurrent.futures import ThreadPoolExecutor
 
 class DashboardApp(tk.Tk):
     """
@@ -22,6 +23,10 @@ class DashboardApp(tk.Tk):
         self.dados = SystemInfo()
         self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU (27 pontos)
         self.memory_used_history = [0] * 27  # Histórico de uso da memória (27 pontos)
+        self.data_ready = False  # Inicializa a flag de dados prontos
+        self.data_lock = threading.Lock()  # Lock para sincronização
+        self.executor = ThreadPoolExecutor(max_workers=4) # Executor para gerenciar threads
+
         try:
             self.create_widgets()
             self.refresh_data()
@@ -108,8 +113,10 @@ class DashboardApp(tk.Tk):
         self.cpu_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de CPU
-        self.cpu_canvas = tk.Canvas(cpu_frame, width=600, height=150, bg="white")  # Gráfico de CPU maior
-        self.cpu_canvas.grid(row=1, column=0, pady=5)
+        self.cpu_canvas = tk.Canvas(cpu_frame, bg="white")  # Remova largura fixa
+        self.cpu_canvas.grid(row=1, column=0, pady=5, sticky="nsew")  # Adicione sticky
+        cpu_frame.rowconfigure(1, weight=1)  # Torna o gráfico responsivo
+        cpu_frame.columnconfigure(0, weight=1)
 
         # Adicionando legendas ao gráfico de CPU
         self.cpu_label_top = tk.Label(cpu_frame, text="100%", anchor="e")
@@ -125,8 +132,10 @@ class DashboardApp(tk.Tk):
         self.memory_info.grid(row=0, column=0, sticky="w")
 
         # Canvas para gráfico de memória
-        self.memory_canvas = tk.Canvas(memory_frame, width=600, height=150, bg="white")  # Gráfico maior
-        self.memory_canvas.grid(row=1, column=0, pady=5)
+        self.memory_canvas = tk.Canvas(memory_frame, bg="white")  # Remova largura fixa
+        self.memory_canvas.grid(row=1, column=0, pady=5, sticky="nsew")  # Adicione sticky
+        memory_frame.rowconfigure(1, weight=1)  # Torna o gráfico responsivo
+        memory_frame.columnconfigure(0, weight=1)
 
         # Adicionando legendas ao gráfico de memória
         self.memory_label_top = tk.Label(memory_frame, text="100%", anchor="e")
@@ -208,13 +217,21 @@ class DashboardApp(tk.Tk):
         self.cpu_usage_history.pop(0)
         self.cpu_usage_history.append(self.dados.cpu_usage)
         self.cpu_canvas.delete("all")
+        width = self.cpu_canvas.winfo_width()
+        height = self.cpu_canvas.winfo_height()
         max_value = 100
-        for i in range(1, len(self.cpu_usage_history)):
-            x1 = (i - 1) * 16  # Ajuste para gráficos maiores
-            y1 = 150 - (self.cpu_usage_history[i - 1] / max_value * 150)
-            x2 = i * 16
-            y2 = 150 - (self.cpu_usage_history[i] / max_value * 150)
-            self.cpu_canvas.create_line(x1, y1, x2, y2, fill="blue", width=2)
+
+        if width == 1 or height == 1:  # Verifica se o Canvas foi renderizado
+            return
+
+        step_x = width / len(self.cpu_usage_history)
+        points = [
+            (i * step_x, height - (value / max_value) * height)
+            for i, value in enumerate(self.cpu_usage_history)
+        ]
+
+        for i in range(len(points) - 1):
+            self.cpu_canvas.create_line(points[i], points[i + 1], fill="blue", width=2)
 
     def update_memory_graph(self):
         """
@@ -225,13 +242,21 @@ class DashboardApp(tk.Tk):
         self.memory_used_history.pop(0)
         self.memory_used_history.append(self.dados.mUsada / 1024)  # Convertendo para MB
         self.memory_canvas.delete("all")
+        width = self.memory_canvas.winfo_width()
+        height = self.memory_canvas.winfo_height()
         max_value = self.dados.mtotal / 1024 if self.dados.mtotal > 0 else 1
-        for i in range(1, len(self.memory_used_history)):
-            x1 = (i - 1) * 16  # Ajuste para gráficos maiores
-            y1 = 150 - (self.memory_used_history[i - 1] / max_value * 150)
-            x2 = i * 16
-            y2 = 150 - (self.memory_used_history[i] / max_value * 150)
-            self.memory_canvas.create_line(x1, y1, x2, y2, fill="green", width=2)
+
+        if width == 1 or height == 1:  # Verifica se o Canvas foi renderizado
+            return
+
+        step_x = width / len(self.memory_used_history)
+        points = [
+            (i * step_x, height - (value / max_value) * height)
+            for i, value in enumerate(self.memory_used_history)
+        ]
+
+        for i in range(len(points) - 1):
+            self.memory_canvas.create_line(points[i], points[i + 1], fill="green", width=2)
         
     def fetch_data(self):
         """
@@ -240,12 +265,21 @@ class DashboardApp(tk.Tk):
         Este método coleta informações da CPU, memória, sistema operacional e processos ativos.
         """
         try:
-            # Busca todas as informações necessárias
-            fetch_cpu_info(self.dados)
-            fetch_memory_info(self.dados)
-            fetch_os_info(self.dados)
-            fetch_active_processes(self.dados)
-            self.data_ready = True  # Sinaliza que os dados estão prontos
+            tasks = [
+                self.executor.submit(fetch_cpu_info, self.dados),
+                self.executor.submit(fetch_memory_info, self.dados),
+                self.executor.submit(fetch_os_info, self.dados),
+                self.executor.submit(fetch_active_processes, self.dados),
+            ]
+
+            # Aguardar todas as threads finalizarem
+            for task in tasks:
+                task.result()
+                        
+            # Atualiza a flag dentro de um lock
+            with self.data_lock:
+                self.data_ready = True
+
         except Exception:
             print("Dashboard - fetch_data: Erro ao buscar dados do sistema")
             traceback.print_exc()
@@ -274,14 +308,11 @@ class DashboardApp(tk.Tk):
         Este método verifica regularmente se os dados estão prontos e, se estiverem, atualiza a interface.
         """
         try:
-            if hasattr(self, 'data_ready') and self.data_ready:
-                # Atualiza a interface quando os dados estiverem prontos
-                self.update_display()
-                self.data_ready = False  # Reseta a flag para a próxima atualização
-                self.after(1000, self.refresh_data)  # Agende a próxima atualização após 1 segundo
-            else:
-                # Continue verificando se os dados estão prontos
-                self.after(1000, self.check_data_ready)
+            with self.data_lock:
+                if self.data_ready:
+                    self.update_display()  # Atualiza a interface
+                    self.data_ready = False  # Reseta a flag
+            self.after(1000, self.refresh_data)  # Agende a próxima atualização
         except Exception:
             print("Dashboard - check_data_ready: Erro ao verificar se os dados estão prontos")
             traceback.print_exc()

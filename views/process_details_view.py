@@ -7,6 +7,8 @@ from services import (
     fetch_process_details,
 )
 from services.system_info_service import format_memory
+from concurrent.futures import ThreadPoolExecutor
+
 
 
 class ProcessDetailsWindow(tk.Toplevel):
@@ -29,6 +31,9 @@ class ProcessDetailsWindow(tk.Toplevel):
         self.geometry("600x400")
         self.pid = pid
         self.data_ready = False
+        self.data_lock = threading.Lock()  # Lock para exclusão mútua
+        self.executor = ThreadPoolExecutor(max_workers=2)  # Executor para gerenciar a concorrência
+        self.details = {}
 
         try:
             self.details_label = ttk.Label(self, text=f"Details for Process {pid}:", font=("Arial", 12, "bold"))
@@ -38,7 +43,6 @@ class ProcessDetailsWindow(tk.Toplevel):
             self.details_text = tk.Text(self, wrap="word", state="disabled")  # Start with disabled state
             self.details_text.pack(fill="both", expand=True, padx=10, pady=5)
 
-            self.fetch_details()
             self.refresh_data()
         except Exception:
             print(f"ProcessDetailsWindow - __init__: Erro ao inicializar a janela de detalhes para PID {pid}")
@@ -51,9 +55,10 @@ class ProcessDetailsWindow(tk.Toplevel):
         Este método processa e exibe os detalhes do processo, como nome, estado, memória usada, e outras informações relevantes.
         """
         try:
-            if not hasattr(self, 'details') or not self.details:
-                return  # Garante que self.details existe antes de atualizar
-
+            with self.data_lock:
+                if not self.details:
+                    return
+                
             useful_keys = ["Name", "State", "Pid", "PPid", "Threads", "VmRSS", "VmSize", "User"]
 
             # Temporariamente habilita o widget para edição e limpa o conteúdo anterior
@@ -81,14 +86,21 @@ class ProcessDetailsWindow(tk.Toplevel):
         Este método coleta informações detalhadas do processo identificado pelo PID e sinaliza quando os dados estão prontos.
         """
         try:
-            self.details = fetch_process_details(self.pid)
-            self.data_ready = True  # Sinaliza que os dados foram buscados
+            #details = fetch_process_details(self.pid)            
+            future = self.executor.submit(fetch_process_details, self.pid)
+
+             # Aguarda a conclusão da tarefa e obtém o resultado
+            details = future.result()
+
+            with self.data_lock:
+                self.details = details
+                self.data_ready = True # Sinaliza que os dados foram buscados
         except Exception:
             print(f"ProcessDetailsWindow - fetch_details: Erro ao buscar detalhes do processo PID {self.pid}")
             traceback.print_exc()
-            self.details = {}
-            self.data_ready = True  # Mesmo com erro, sinaliza que a thread terminou
-
+            with self.data_lock:
+                self.details = {}
+                self.data_ready = True
     def refresh_data(self):
         """
         Inicia uma thread para buscar os dados e programa verificações regulares do estado da thread.
@@ -96,9 +108,9 @@ class ProcessDetailsWindow(tk.Toplevel):
         Este método é responsável por garantir que a coleta de dados do processo seja executada de forma assíncrona.
         """
         try:
-            # Inicia a thread para buscar os detalhes do processo
-            thread = threading.Thread(target=self.fetch_details, daemon=True)
-            thread.start()
+            # Submete a tarefa de buscar os detalhes do processo ao executor
+            self.executor.submit(self.fetch_details)
+
 
             # Programa verificações regulares do estado da thread
             self.after(1000, self.check_data_ready)
@@ -113,13 +125,12 @@ class ProcessDetailsWindow(tk.Toplevel):
         Este método verifica regularmente se os dados do processo foram carregados e, caso positivo, atualiza a exibição.
         """
         try:
-            if hasattr(self, 'data_ready') and self.data_ready:
-                self.update_display()
-                self.data_ready = False  # Reseta a flag para a próxima atualização
-                self.after(1000, self.refresh_data)  # Programa a próxima atualização
-            else:
-                # Continua verificando se os dados estão prontos
-                self.after(1000, self.check_data_ready)
+            with self.data_lock:
+                if self.data_ready:
+                    self.data_ready = False  # Reseta a flag
+                    self.after_idle(self.update_display)  # Atualiza a interface de forma assíncrona
+            self.after(1000, self.refresh_data)  # Programa a próxima verificação
+
         except Exception:
             print(f"ProcessDetailsWindow - check_data_ready: Erro ao verificar se os dados estão prontos para PID {self.pid}")
             traceback.print_exc()
