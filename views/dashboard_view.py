@@ -171,15 +171,15 @@ class DashboardApp(tk.Tk):
 
         Este método atualiza as informações da CPU, memória, SO e os processos ativos exibidos na interface gráfica.
         """
-        # Atualização das informações de CPU
+        
         self.cpu_info.config(text=(
             f"Name: {self.dados.cpu_name}\n"
             f"Cores: {self.dados.quantidadeCPU}\n"
             f"Frequency: {self.dados.cpu_ghz} GHz\n"
             f"Usage: {self.dados.cpu_usage}%\n"
-            f"Idle: {self.dados.idle_percent}%\n"  # Novo: Percentual de tempo ocioso
-            f"Processes: {self.dados.total_processos}\n"  # Novo: Total de processos
-            f"Threads: {self.dados.total_threads}"  # Novo: Total de threads
+            f"Idle: {self.dados.idle_percent}%\n" 
+            f"Processes: {self.dados.total_processos}\n" 
+            f"Threads: {self.dados.total_threads}" 
         ))
 
         # Atualização das informações de memória

@@ -2,7 +2,9 @@ import os
 import time
 import traceback
 
-WSL_PATH = r"\\wsl.localhost\Ubuntu-22.04"
+from models.process_details_model import ProcessDetails
+
+WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
 
 def fetch_cpu_info(dados):
     """
@@ -120,22 +122,24 @@ def fetch_process_details(pid, process_details):
     
 def fetch_process_tasks(pid, tasks):
     """
-    Coleta detalhes sobre um processo específico com base no seu PID.
+    Coleta detalhes sobre as threads de um processo específico com base no PID.
 
     Parâmetros:
         pid (str): ID do processo para o qual os detalhes serão coletados.
-
-    Retorno:
-        dict: Dicionário contendo os detalhes do processo, incluindo:
-            - User (str): Usuário que iniciou o processo.
-            - Chaves adicionais: Informações obtidas a partir do arquivo `/proc/[pid]/status`.
-            - Error (str): Mensagem de erro, caso o processo não seja encontrado.
+        tasks (list): Lista para armazenar os objetos `ProcessDetails` das threads.
     """
     try:
-        process_tasks = _read_process_tasks(pid)
-        _parse_process_details(process_tasks, tasks)
-    except Exception:
-        return {"Error": f"Process {pid} not found."}
+        process_tasks = _read_process_tasks(pid)  # Lê os dados das threads no diretório `/proc/[pid]/task`
+        tasks.clear()  # Limpa a lista de threads para garantir que está vazia antes de começar
+
+        # Processa cada thread (task) e adiciona à lista
+        for task_status in process_tasks:
+            task_details = ProcessDetails()  # Cria um novo objeto para armazenar os detalhes da thread
+            _parse_process_details("\n".join(task_status), task_details)  # Analisa os detalhes da thread
+            tasks.append(task_details)  # Adiciona o objeto processado à lista de tasks
+    except Exception as e:
+        print(f"Error fetching threads for PID {pid}: {e}")
+        traceback.print_exc()
 
 def _collect_basic_cpu_info(dados):
     """
@@ -347,6 +351,18 @@ def _read_process_status(pid):
         return f.read()
     
 def _read_process_tasks(pid):
+    """
+    Lê os detalhes das threads (tasks) de um processo específico com base no PID.
+
+    Esta função acessa o diretório `/proc/<pid>/task` para listar todas as threads associadas a um processo e retorna as informações do arquivo `status` de cada thread.
+
+    Parâmetros:
+        pid (int): ID do processo (PID) cujas threads serão lidas.
+
+    Retorno:
+        list: Lista de listas, onde cada sublista contém as linhas do arquivo `status` de uma task específica.
+
+    """
     tasks_path = adjust_path(f"/proc/{pid}/task")
 
     # Verificar se o diretório existe
@@ -367,10 +383,8 @@ def _read_process_tasks(pid):
                     tasks_data.append(status_lines)
 
             except FileNotFoundError:
-                # Ignorar threads que podem ter terminado durante a leitura
                 continue
 
-    # Retorna a lista com informações de todas as threads
     return tasks_data
 
 
@@ -392,11 +406,11 @@ def _get_user_from_status(status):
 
 def _parse_process_details(status, process_details):
     """
-    Analisa os detalhes do processo a partir do status e do usuário.
+    Analisa os detalhes do processo a partir do conteúdo do arquivo de status.
 
     Parâmetros:
-        status (str): Conteúdo do arquivo de status do processo.
-        user (str): Nome do usuário que iniciou o processo.
+        status (str): Conteúdo do arquivo `status` do processo, contendo informações sobre o processo.
+        process_details (ProcessDetails): Objeto onde os detalhes do processo serão armazenados.
 
     Retorno:
         dict: Dicionário contendo os detalhes do processo.

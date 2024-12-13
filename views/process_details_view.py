@@ -7,10 +7,7 @@ from services import (
     fetch_process_details,
     fetch_process_tasks,
 )
-from services.system_info_service import format_memory
 from concurrent.futures import ThreadPoolExecutor
-
-
 
 class ProcessDetailsWindow(tk.Toplevel):
     """
@@ -35,45 +32,70 @@ class ProcessDetailsWindow(tk.Toplevel):
         self.data_lock = threading.Lock()  # Lock para exclusão mútua
         self.executor = ThreadPoolExecutor(max_workers=2)  # Executor para gerenciar a concorrência
         self.details = ProcessDetails()
-        self.tasks = ProcessDetails()
+        self.tasks = []
 
         try:
-            # Configuração do layout principal
-            self.main_frame = ttk.Frame(self)
+            # Configuração do layout principal com Canvas para suporte a rolagem
+            self.canvas = tk.Canvas(self, highlightthickness=0)
+            self.scroll_frame = ttk.Frame(self.canvas)
+
+            # Scrollbars para a tela principal
+            self.scrollbar_vertical = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+            self.scrollbar_horizontal = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+
+            # Configuração do canvas
+            self.canvas.configure(yscrollcommand=self.scrollbar_vertical.set, xscrollcommand=self.scrollbar_horizontal.set)
+
+            # Posiciona o canvas e as barras de rolagem
+            self.scrollbar_vertical.pack(side="right", fill="y")
+            self.scrollbar_horizontal.pack(side="bottom", fill="x")
+            self.canvas.pack(side="left", fill="both", expand=True)
+
+            # Adiciona o frame interno ao canvas
+            self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+
+            # Configuração do frame interno
+            self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+
+            # Layout interno no frame rolável
+            self.main_frame = ttk.Frame(self.scroll_frame)
             self.main_frame.grid(row=0, column=0, sticky="nsew")
-            self.rowconfigure(0, weight=1)
-            self.columnconfigure(0, weight=1)
+            self.main_frame.rowconfigure(0, weight=1)
+            self.main_frame.columnconfigure(0, weight=1)
 
             # Primeira seção: Detalhes do processo
             process_details_frame = ttk.LabelFrame(self.main_frame, text="Process Details", padding="10")
             process_details_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
 
-            # Label para detalhes do processo
             self.details_text = tk.Text(process_details_frame, wrap="word", state="disabled", height=10)
             self.details_text.pack(fill="both", expand=True, padx=10, pady=5)
 
-            # Segunda seção: Tabela com threads (tasks)
-            tasks_frame = ttk.LabelFrame(self.main_frame, text="Threads (Tasks)", padding="10")
+            # Segunda seção: Tabela com tasks
+            tasks_frame = ttk.LabelFrame(self.main_frame, text="Tasks", padding="10")
             tasks_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
 
             # Configuração do Treeview para threads
             columns = ("Pid", "Name", "State", "VmSize", "VmRSS", "VmExe")
             self.tasks_table = ttk.Treeview(tasks_frame, columns=columns, show="headings", height=15)
-            self.tasks_table.pack(fill="both", expand=True)
 
             # Configurando as colunas do Treeview
             for col in columns:
                 self.tasks_table.heading(col, text=col.capitalize(), anchor="center")
                 self.tasks_table.column(col, width=150, anchor="center")
 
-            # Scrollbar vertical para o Treeview
-            scrollbar = ttk.Scrollbar(tasks_frame, orient="vertical", command=self.tasks_table.yview)
-            self.tasks_table.config(yscrollcommand=scrollbar.set)
-            scrollbar.pack(side="right", fill="y")
+            # Scrollbars para o Treeview
+            tree_scroll_vertical = ttk.Scrollbar(tasks_frame, orient="vertical", command=self.tasks_table.yview)
+            tree_scroll_horizontal = ttk.Scrollbar(tasks_frame, orient="horizontal", command=self.tasks_table.xview)
+            self.tasks_table.configure(yscrollcommand=tree_scroll_vertical.set, xscrollcommand=tree_scroll_horizontal.set)
 
-            # Ajustando o layout responsivo
-            self.main_frame.rowconfigure(0, weight=1)  # Primeira seção
-            self.main_frame.rowconfigure(1, weight=2)  # Segunda seção
+            # Posicionando barras de rolagem e tabela
+            tree_scroll_vertical.pack(side="right", fill="y")
+            tree_scroll_horizontal.pack(side="bottom", fill="x")
+            self.tasks_table.pack(fill="both", expand=True)
+
+            # Ajusta a região rolável do canvas após inicializar todos os widgets
+            self.update_idletasks()
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
             # Carregar dados iniciais
             self.refresh_data()
@@ -111,18 +133,20 @@ class ProcessDetailsWindow(tk.Toplevel):
                     
             # Atualização do Treeview
             self.tasks_table.delete(*self.tasks_table.get_children())
-            
-            self.tasks_table.insert(
-                "",  # Representa a linha sem um identificador específico
-                "end",  # Inserir no final da tabela
-                values=(
-                    self.tasks.pid,  # Acessa o PID diretamente
-                    self.tasks.name,  # Acessa o nome diretamente
-                    self.tasks.state,  # Acessa o estado diretamente
+            for task in self.tasks:
+                self.tasks_table.insert(
+                    "",
+                    "end",
+                    values=(
+                        task.pid,
+                        task.name,
+                        task.state,
+                        task.vm_size,
+                        task.vm_rss,
+                        task.vm_exe,
+                    )
                 )
-            )
 
-            # Desabilita o widget para evitar edições
             self.details_text.config(state="disabled")
         except Exception:
             print(f"ProcessDetailsWindow - update_display: Erro ao atualizar os detalhes do processo PID {self.pid}")
