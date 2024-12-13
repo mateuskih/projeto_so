@@ -17,11 +17,12 @@ class ProcessDetails:
     """
 
     def __init__(self):
-        self.name=""
-        self.state=""
-        self.pid=0
-        self.ppid=0
-        self.vm_size="0 kB"
-        self.vm_rss="0 kB"
-        self.vm_exe="0 kB"
-        self.threads=0
+        self.name = ""
+        self.state = ""
+        self.pid = 0
+        self.ppid = 0
+        self.vm_size = "0 kB"
+        self.vm_rss = "0 kB"
+        self.vm_exe = "0 kB"
+        self.threads = 0
+

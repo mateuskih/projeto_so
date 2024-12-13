@@ -7,6 +7,7 @@ from services.system_info_service import fetch_active_processes, fetch_cpu_info,
 from .process_details_view import ProcessDetailsWindow
 from concurrent.futures import ThreadPoolExecutor
 
+
 class DashboardApp(tk.Tk):
     """
     Classe principal para a aplicação de dashboard.
@@ -21,10 +22,11 @@ class DashboardApp(tk.Tk):
         self.title("Dashboard Sistemas Operacionais CSO30-S71 2024.2 - Mateus e Murilo")
         self.geometry("600x600")  # Ajuste para um tamanho inicial
         self.dados = SystemInfo()
-        self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU (27 pontos)
+        self.cpu_usage_history = [0] * 27  # Histórico de uso da CPU
+        # (27 pontos)
         self.memory_used_history = [0] * 27  # Histórico de uso da memória (27 pontos)
         self.data_ready = False  # Inicializa a flag de dados prontos
-        self.data_lock = threading.Lock()  # Lock para sincronização
+        self.data_lock = threading.Lock()  # Lock para sincronizaçã
         self.executor = ThreadPoolExecutor(max_workers=4) # Executor para gerenciar threads
 
         try:
@@ -164,7 +166,6 @@ class DashboardApp(tk.Tk):
 
         self.process_info.bind("<Double-1>", self.show_process_details)
 
-
     def update_display(self):
         """
         Atualiza as informações exibidas na interface.
@@ -189,7 +190,6 @@ class DashboardApp(tk.Tk):
             f"Total: {self.dados.mtotal // 1024} MB\n"
             f"Used: {self.dados.mUsada // 1024} MB ({mem_used_percent:.2f}%)\n"
             f"Free: {self.dados.mLivre // 1024} MB ({100 - mem_used_percent:.2f}%)\n\n"
-            
             f"Swap Total: {self.dados.swapTotal // 1024} MB\n"
             f"Swap Used: {(self.dados.swapTotal - self.dados.swapFree) // 1024} MB ({mem_swap_used_percent:.2f}%)\n"
             f"Swap Free: {self.dados.swapFree // 1024} MB ({100 - mem_swap_used_percent:.2f}%)"

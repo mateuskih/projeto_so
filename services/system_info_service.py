@@ -6,6 +6,7 @@ from models.process_details_model import ProcessDetails
 
 WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
 
+
 def fetch_cpu_info(dados):
     """
     Coleta informações detalhadas do CPU.
@@ -80,6 +81,7 @@ def fetch_active_processes(dados):
         print(f"system_info_service - fetch_active_processes: Erro ao abrir arquivo /proc")
         traceback.print_exc()
 
+
 def fetch_os_info(dados):
     """
     Coleta informações sobre o sistema operacional.
@@ -101,6 +103,7 @@ def fetch_os_info(dados):
         print(f"system_info_service - fetch_os_info: Erro ao abrir arquivos /proc/version /proc/sys/kernel/hostname /proc/sys/kernel/osrelease")
         traceback.print_exc()
 
+
 def fetch_process_details(pid, process_details):
     """
     Coleta detalhes sobre um processo específico com base no seu PID.
@@ -120,6 +123,7 @@ def fetch_process_details(pid, process_details):
     except Exception:
         return {"Error": f"Process {pid} not found."}
     
+
 def fetch_process_tasks(pid, tasks):
     """
     Coleta detalhes sobre as threads de um processo específico com base no PID.
@@ -140,6 +144,7 @@ def fetch_process_tasks(pid, tasks):
     except Exception as e:
         print(f"Error fetching threads for PID {pid}: {e}")
         traceback.print_exc()
+
 
 def _collect_basic_cpu_info(dados):
     """
@@ -162,6 +167,7 @@ def _collect_basic_cpu_info(dados):
     dados.cpu_name = cpu_name
     dados.cpu_ghz = round(cpu_mhz / 1000, 2)
 
+
 def _read_initial_cpu_times():
     """
     Lê os tempos iniciais da CPU a partir do arquivo `/proc/stat`.
@@ -177,6 +183,7 @@ def _read_initial_cpu_times():
             if line.startswith("cpu "):
                 values = list(map(int, line.split()[1:]))
                 return values[3], sum(values)
+
 
 def _calculate_cpu_usage(dados, idle_time, total_time):
     """
@@ -202,6 +209,7 @@ def _calculate_cpu_usage(dados, idle_time, total_time):
                 dados.idle_percent = round(idle_percent, 2)
                 break
 
+
 def _count_active_processes_and_threads(dados):
     """
     Conta o número total de processos e threads ativos no sistema.
@@ -219,6 +227,7 @@ def _count_active_processes_and_threads(dados):
             total_threads += _count_threads_in_process(pid)
     dados.total_processos = total_processos
     dados.total_threads = total_threads
+
 
 def _count_threads_in_process(pid):
     """
@@ -239,6 +248,7 @@ def _count_threads_in_process(pid):
     except (FileNotFoundError, KeyError):
         return 0
 
+
 def _read_memory_info():
     """
     Lê informações de memória do sistema a partir de `/proc/meminfo`.
@@ -258,6 +268,7 @@ def _read_memory_info():
         print(f"system_info_service - get_username_from_uid: Erro ao abrir arquivo {path}")
         traceback.print_exc()
 
+
 def _store_memory_info(dados, meminfo):
     """
     Armazena informações de memória no objeto de dados.
@@ -274,6 +285,7 @@ def _store_memory_info(dados, meminfo):
     dados.swapFree = meminfo.get("SwapFree", 0)
     dados.mUsada = dados.mtotal - dados.mLivre - dados.buffers
 
+
 def _collect_processes():
     """
     Coleta informações de todos os processos ativos.
@@ -289,6 +301,7 @@ def _collect_processes():
             if process_data:
                 processos.append(process_data)
     return processos
+
 
 def _parse_process_status(pid):
     """
@@ -322,6 +335,7 @@ def _parse_process_status(pid):
     except (FileNotFoundError, KeyError):
         return None
 
+
 def _read_file_content(path):
     """
     Lê o conteúdo de um arquivo e retorna como string.
@@ -350,6 +364,7 @@ def _read_process_status(pid):
     with open(status_path, "r") as f:
         return f.read()
     
+
 def _read_process_tasks(pid):
     """
     Lê os detalhes das threads (tasks) de um processo específico com base no PID.
@@ -404,6 +419,7 @@ def _get_user_from_status(status):
             return get_username_from_uid(uid)
     return "unknown"
 
+
 def _parse_process_details(status, process_details):
     """
     Analisa os detalhes do processo a partir do conteúdo do arquivo de status.
@@ -429,6 +445,7 @@ def _parse_process_details(status, process_details):
     process_details.vm_exe = format_memory(int(details.get("VmExe", 0).split()[0]))
     process_details.threads = details.get("Threads")
 
+
 def adjust_path(path):
     """
     Ajusta o caminho para redirecionar para o WSL, se necessário.
@@ -445,6 +462,7 @@ def adjust_path(path):
     if os.name == 'nt':
         return os.path.join(WSL_PATH, path.lstrip('/').replace('/', '\\'))
     return path
+
 
 def format_memory(size_kb):
     """

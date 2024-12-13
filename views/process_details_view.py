@@ -9,6 +9,7 @@ from services import (
 )
 from concurrent.futures import ThreadPoolExecutor
 
+
 class ProcessDetailsWindow(tk.Toplevel):
     """
     Classe que representa uma janela de detalhes de um processo específico.
@@ -169,7 +170,6 @@ class ProcessDetailsWindow(tk.Toplevel):
             for task in tasks:
                 task.result()   
             
-
             with self.data_lock:
                 self.data_ready = True # Sinaliza que os dados foram buscados
         except Exception:
@@ -177,6 +177,7 @@ class ProcessDetailsWindow(tk.Toplevel):
             traceback.print_exc()
             with self.data_lock:
                 self.data_ready = True
+
     def refresh_data(self):
         """
         Inicia uma thread para buscar os dados e programa verificações regulares do estado da thread.

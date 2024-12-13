@@ -34,4 +34,3 @@ class SystemInfo:
         self.total_threads = 0
         self.infoSO = ""
         self.processosAtivos = []
-
