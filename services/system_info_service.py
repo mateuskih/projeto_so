@@ -99,7 +99,7 @@ def fetch_os_info(dados):
         print(f"system_info_service - fetch_os_info: Erro ao abrir arquivos /proc/version /proc/sys/kernel/hostname /proc/sys/kernel/osrelease")
         traceback.print_exc()
 
-def fetch_process_details(pid):
+def fetch_process_details(pid, process_details):
     """
     Coleta detalhes sobre um processo específico com base no seu PID.
 
@@ -114,12 +114,11 @@ def fetch_process_details(pid):
     """
     try:
         status = _read_process_status(pid)
-        user = _get_user_from_status(status)
-        return _parse_process_details(status, user)
+        _parse_process_details(status, process_details)
     except Exception:
         return {"Error": f"Process {pid} not found."}
     
-def fetch_process_tasks(pid):
+def fetch_process_tasks(pid, tasks):
     """
     Coleta detalhes sobre um processo específico com base no seu PID.
 
@@ -133,7 +132,8 @@ def fetch_process_tasks(pid):
             - Error (str): Mensagem de erro, caso o processo não seja encontrado.
     """
     try:
-        return _read_process_tasks(pid)
+        process_tasks = _read_process_tasks(pid)
+        _parse_process_details(process_tasks, tasks)
     except Exception:
         return {"Error": f"Process {pid} not found."}
 
@@ -358,23 +358,13 @@ def _read_process_tasks(pid):
     # Iterar sobre cada thread (task) no diretório
     for tid in os.listdir(tasks_path):
         if tid.isdigit():
-            task_info = {}
             task_path_info = os.path.join(tasks_path, tid)
 
             try:
                 # Ler informações básicas da thread
                 with open(os.path.join(task_path_info, "status"), "r") as f:
                     status_lines = f.readlines()
-                    for line in status_lines:
-                        key, *value = line.split(":")
-                        if key and value:
-                            task_info[key.strip()] = ":".join(value).strip()
-
-                # Adicionar o TID às informações
-                task_info["tid"] = int(tid)
-
-                # Adicionar informações da thread à lista
-                tasks_data.append(task_info)
+                    tasks_data.append(status_lines)
 
             except FileNotFoundError:
                 # Ignorar threads que podem ter terminado durante a leitura
@@ -400,7 +390,7 @@ def _get_user_from_status(status):
             return get_username_from_uid(uid)
     return "unknown"
 
-def _parse_process_details(status, user):
+def _parse_process_details(status, process_details):
     """
     Analisa os detalhes do processo a partir do status e do usuário.
 
@@ -411,11 +401,19 @@ def _parse_process_details(status, user):
     Retorno:
         dict: Dicionário contendo os detalhes do processo.
     """
-    details = {"User": user}
+    details = {}
     for line in status.splitlines():
         key, *value = line.split(":")
         details[key.strip()] = ":".join(value).strip()
-    return details
+    
+    process_details.name = details.get("Name")
+    process_details.state = details.get("State")
+    process_details.pid = details.get("Pid")
+    process_details.ppid = details.get("PPid")
+    process_details.vm_size = format_memory(int(details.get("VmSize", 0).split()[0]))
+    process_details.vm_rss = format_memory(int(details.get("VmRSS", 0).split()[0]))
+    process_details.vm_exe = format_memory(int(details.get("VmExe", 0).split()[0]))
+    process_details.threads = details.get("Threads")
 
 def adjust_path(path):
     """

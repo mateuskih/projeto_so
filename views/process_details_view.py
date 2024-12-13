@@ -34,8 +34,8 @@ class ProcessDetailsWindow(tk.Toplevel):
         self.data_ready = False
         self.data_lock = threading.Lock()  # Lock para exclusão mútua
         self.executor = ThreadPoolExecutor(max_workers=2)  # Executor para gerenciar a concorrência
-        self.details = {}
-        self.tasks = {}
+        self.details = ProcessDetails()
+        self.tasks = ProcessDetails()
 
         try:
             # Configuração do layout principal
@@ -91,36 +91,36 @@ class ProcessDetailsWindow(tk.Toplevel):
             with self.data_lock:
                 if not self.details:
                     return
-                
-            useful_keys = ["User", "Name", "State", "Pid", "PPid", "VmSize", "VmRSS", "VmPeak", "Threads"]
-            
+   
             # Temporariamente habilita o widget para edição e limpa o conteúdo anterior
             self.details_text.config(state="normal")
             self.details_text.delete("1.0", tk.END)
 
             # Atualiza o conteúdo com as informações processadas
-            for key in useful_keys:
-                if key in self.details:
-                    value = self.details[key]
-                    if key in ["VmSize", "VmRSS"] and value.split()[0].isdigit():
-                        value = format_memory(int(value.split()[0]))
-                    self.details_text.insert(tk.END, f"{key}: {value}\n")
+
+            self.details_text.insert(tk.END, ''.join([
+                f"Name: {self.details.name}\n",
+                f"State: {self.details.state}\n",
+                f"Pid: {self.details.pid}\n",
+                f"PPid: {self.details.ppid}\n",
+                f"VmSize: {self.details.vm_size}\n",
+                f"VmRSS: {self.details.vm_rss}\n",
+                f"VmExe: {self.details.vm_exe}\n",
+                f"Threads: {self.details.threads}\n",
+            ]))
                     
             # Atualização do Treeview
             self.tasks_table.delete(*self.tasks_table.get_children())
-            for task in self.tasks:
-                self.tasks_table.insert(
-                    "",
-                    "end",
-                    values=(
-                        task.get("Pid", ""),
-                        task.get("Name", ""),
-                        task.get("State", ""),
-                        format_memory(int(task.get("VmSize", 0).split()[0])),
-                        format_memory(int(task.get("VmRSS", 0).split()[0])),
-                        format_memory(int(task.get("VmExe", 0).split()[0])),
-                    ),
+            
+            self.tasks_table.insert(
+                "",  # Representa a linha sem um identificador específico
+                "end",  # Inserir no final da tabela
+                values=(
+                    self.tasks.pid,  # Acessa o PID diretamente
+                    self.tasks.name,  # Acessa o nome diretamente
+                    self.tasks.state,  # Acessa o estado diretamente
                 )
+            )
 
             # Desabilita o widget para evitar edições
             self.details_text.config(state="disabled")
@@ -137,25 +137,21 @@ class ProcessDetailsWindow(tk.Toplevel):
         try:
             #details = fetch_process_details(self.pid)            
             tasks = [
-                self.executor.submit(fetch_process_details, self.pid),
-                self.executor.submit(fetch_process_tasks, self.pid)
+                self.executor.submit(fetch_process_details, self.pid, self.details),
+                self.executor.submit(fetch_process_tasks, self.pid, self.tasks)
             ]
 
             # Aguarda a conclusão da tarefa e obtém o resultado
-            details = tasks[0].result()
-            process_tasks = tasks[1].result()    
+            for task in tasks:
+                task.result()   
             
 
             with self.data_lock:
-                self.details = details
-                self.tasks = process_tasks
                 self.data_ready = True # Sinaliza que os dados foram buscados
         except Exception:
             print(f"ProcessDetailsWindow - fetch_details: Erro ao buscar detalhes do processo PID {self.pid}")
             traceback.print_exc()
             with self.data_lock:
-                self.details = {}
-                self.tasks = {}
                 self.data_ready = True
     def refresh_data(self):
         """
