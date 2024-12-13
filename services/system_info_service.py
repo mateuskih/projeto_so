@@ -22,11 +22,11 @@ def fetch_cpu_info(dados):
             - total_threads (int): Número total de threads ativas.
     """
     try:
-        _collect_basic_cpu_info(dados)
-        idle_time, total_time = _read_initial_cpu_times()
+        collect_basic_cpu_info(dados)
+        idle_time, total_time = read_initial_cpu_times()
         time.sleep(0.1)
-        _calculate_cpu_usage(dados, idle_time, total_time)
-        _count_active_processes_and_threads(dados)
+        calculate_cpu_usage(dados, idle_time, total_time)
+        count_active_processes_and_threads(dados)
     except Exception:
         dados.cpu_name = "Unknown"
         dados.cpu_ghz = 0.0
@@ -36,6 +36,7 @@ def fetch_cpu_info(dados):
         dados.total_threads = 0
         print(f"system_info_service - fetch_cpu_info: Erro ao abrir arquivo /proc/cpuinfo")
         traceback.print_exc()
+
 
 def fetch_memory_info(dados):
     """
@@ -52,8 +53,8 @@ def fetch_memory_info(dados):
             - mUsada (int): Quantidade de memória em uso (em KB).
     """
     try:
-        meminfo = _read_memory_info()
-        _store_memory_info(dados, meminfo)
+        meminfo = read_memory_info()
+        store_memory_info(dados, meminfo)
     except Exception:
         print(f"system_info_service - fetch_memory_info: Erro ao abrir arquivo /proc/meminfo")
         traceback.print_exc()
@@ -74,7 +75,7 @@ def fetch_active_processes(dados):
                 - comando (str): Nome do comando do processo.
     """
     try:
-        processos = _collect_processes()
+        processos = collect_processes()
         dados.processosAtivos = processos
     except Exception:
         dados.processosAtivos = []
@@ -94,9 +95,9 @@ def fetch_os_info(dados):
                 - Arquitetura do sistema.
     """
     try:
-        kernel_info = _read_file_content(adjust_path("/proc/version"))
-        hostname = _read_file_content(adjust_path("/proc/sys/kernel/hostname"))
-        architecture = _read_file_content(adjust_path("/proc/sys/kernel/osrelease"))
+        kernel_info = read_file_content(adjust_path("/proc/version"))
+        hostname = read_file_content(adjust_path("/proc/sys/kernel/hostname"))
+        architecture = read_file_content(adjust_path("/proc/sys/kernel/osrelease"))
         dados.infoSO = f"Kernel: {kernel_info.strip()}\nHostname: {hostname.strip()}\nArchitecture: {architecture.strip()}"
     except Exception:
         dados.infoSO = "Unknown OS"
@@ -118,8 +119,8 @@ def fetch_process_details(pid, process_details):
             - Error (str): Mensagem de erro, caso o processo não seja encontrado.
     """
     try:
-        status = _read_process_status(pid)
-        _parse_process_details(status, process_details)
+        status = read_process_status(pid)
+        parse_process_details(status, process_details)
     except Exception:
         return {"Error": f"Process {pid} not found."}
     
@@ -133,20 +134,20 @@ def fetch_process_tasks(pid, tasks):
         tasks (list): Lista para armazenar os objetos `ProcessDetails` das threads.
     """
     try:
-        process_tasks = _read_process_tasks(pid)  # Lê os dados das threads no diretório `/proc/[pid]/task`
+        process_tasks = read_process_tasks(pid)  # Lê os dados das threads no diretório `/proc/[pid]/task`
         tasks.clear()  # Limpa a lista de threads para garantir que está vazia antes de começar
 
         # Processa cada thread (task) e adiciona à lista
         for task_status in process_tasks:
             task_details = ProcessDetails()  # Cria um novo objeto para armazenar os detalhes da thread
-            _parse_process_details("\n".join(task_status), task_details)  # Analisa os detalhes da thread
+            parse_process_details("\n".join(task_status), task_details)  # Analisa os detalhes da thread
             tasks.append(task_details)  # Adiciona o objeto processado à lista de tasks
     except Exception as e:
         print(f"Error fetching threads for PID {pid}: {e}")
         traceback.print_exc()
 
 
-def _collect_basic_cpu_info(dados):
+def collect_basic_cpu_info(dados):
     """
     Lê informações básicas do CPU a partir do arquivo `/proc/cpuinfo`.
 
@@ -168,7 +169,7 @@ def _collect_basic_cpu_info(dados):
     dados.cpu_ghz = round(cpu_mhz / 1000, 2)
 
 
-def _read_initial_cpu_times():
+def read_initial_cpu_times():
     """
     Lê os tempos iniciais da CPU a partir do arquivo `/proc/stat`.
 
@@ -185,7 +186,7 @@ def _read_initial_cpu_times():
                 return values[3], sum(values)
 
 
-def _calculate_cpu_usage(dados, idle_time, total_time):
+def calculate_cpu_usage(dados, idle_time, total_time):
     """
     Calcula o uso da CPU e o tempo ocioso após um intervalo.
 
@@ -210,7 +211,7 @@ def _calculate_cpu_usage(dados, idle_time, total_time):
                 break
 
 
-def _count_active_processes_and_threads(dados):
+def count_active_processes_and_threads(dados):
     """
     Conta o número total de processos e threads ativos no sistema.
 
@@ -224,12 +225,12 @@ def _count_active_processes_and_threads(dados):
     for pid in os.listdir(proc_path):
         if pid.isdigit():
             total_processos += 1
-            total_threads += _count_threads_in_process(pid)
+            total_threads += count_threads_in_process(pid)
     dados.total_processos = total_processos
     dados.total_threads = total_threads
 
 
-def _count_threads_in_process(pid):
+def count_threads_in_process(pid):
     """
     Conta o número de threads em um processo específico.
 
@@ -249,7 +250,7 @@ def _count_threads_in_process(pid):
         return 0
 
 
-def _read_memory_info():
+def read_memory_info():
     """
     Lê informações de memória do sistema a partir de `/proc/meminfo`.
 
@@ -269,7 +270,7 @@ def _read_memory_info():
         traceback.print_exc()
 
 
-def _store_memory_info(dados, meminfo):
+def store_memory_info(dados, meminfo):
     """
     Armazena informações de memória no objeto de dados.
 
@@ -286,7 +287,7 @@ def _store_memory_info(dados, meminfo):
     dados.mUsada = dados.mtotal - dados.mLivre - dados.buffers
 
 
-def _collect_processes():
+def collect_processes():
     """
     Coleta informações de todos os processos ativos.
 
@@ -297,13 +298,13 @@ def _collect_processes():
     processos = []
     for pid in os.listdir(path):
         if pid.isdigit():
-            process_data = _parse_process_status(pid)
+            process_data = parse_process_status(pid)
             if process_data:
                 processos.append(process_data)
     return processos
 
 
-def _parse_process_status(pid):
+def parse_process_status(pid):
     """
     Analisa o arquivo de status de um processo específico.
 
@@ -336,7 +337,7 @@ def _parse_process_status(pid):
         return None
 
 
-def _read_file_content(path):
+def read_file_content(path):
     """
     Lê o conteúdo de um arquivo e retorna como string.
 
@@ -350,7 +351,7 @@ def _read_file_content(path):
         return f.read()
 
 
-def _read_process_status(pid):
+def read_process_status(pid):
     """
     Lê o status de um processo específico.
 
@@ -365,7 +366,7 @@ def _read_process_status(pid):
         return f.read()
     
 
-def _read_process_tasks(pid):
+def read_process_tasks(pid):
     """
     Lê os detalhes das threads (tasks) de um processo específico com base no PID.
 
@@ -403,7 +404,7 @@ def _read_process_tasks(pid):
     return tasks_data
 
 
-def _get_user_from_status(status):
+def get_user_from_status(status):
     """
     Obtém o usuário a partir do status do processo.
 
@@ -420,7 +421,7 @@ def _get_user_from_status(status):
     return "unknown"
 
 
-def _parse_process_details(status, process_details):
+def parse_process_details(status, process_details):
     """
     Analisa os detalhes do processo a partir do conteúdo do arquivo de status.
 

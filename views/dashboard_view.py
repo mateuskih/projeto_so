@@ -68,9 +68,9 @@ class DashboardApp(tk.Tk):
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
 
         # Adicionar eventos para rolagem com o mouse
-        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind_all("<Button-4>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
-        self.canvas.bind_all("<Button-5>", self._on_mousewheel)  # Suporte adicional para sistemas Unix
+        self.canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self.on_mousewheel)  # Suporte adicional para sistemas Unix
+        self.canvas.bind_all("<Button-5>", self.on_mousewheel)  # Suporte adicional para sistemas Unix
 
         # Adicionar widgets ao frame rolável
         self.create_scrollable_content()
@@ -83,7 +83,7 @@ class DashboardApp(tk.Tk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-    def _on_mousewheel(self, event):
+    def on_mousewheel(self, event):
         """Handler para rolagem com o mouse."""
         if event.num == 4:  # Sistemas Unix (Scroll para cima)
             self.canvas.yview_scroll(-1, "units")
