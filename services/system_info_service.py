@@ -2,7 +2,7 @@ import os
 import time
 import traceback
 
-WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
+WSL_PATH = r"\\wsl.localhost\Ubuntu-22.04"
 
 def fetch_cpu_info(dados):
     """
@@ -116,6 +116,24 @@ def fetch_process_details(pid):
         status = _read_process_status(pid)
         user = _get_user_from_status(status)
         return _parse_process_details(status, user)
+    except Exception:
+        return {"Error": f"Process {pid} not found."}
+    
+def fetch_process_tasks(pid):
+    """
+    Coleta detalhes sobre um processo específico com base no seu PID.
+
+    Parâmetros:
+        pid (str): ID do processo para o qual os detalhes serão coletados.
+
+    Retorno:
+        dict: Dicionário contendo os detalhes do processo, incluindo:
+            - User (str): Usuário que iniciou o processo.
+            - Chaves adicionais: Informações obtidas a partir do arquivo `/proc/[pid]/status`.
+            - Error (str): Mensagem de erro, caso o processo não seja encontrado.
+    """
+    try:
+        return _read_process_tasks(pid)
     except Exception:
         return {"Error": f"Process {pid} not found."}
 
@@ -280,7 +298,7 @@ def _parse_process_status(pid):
     """
     try:
         status_path = os.path.join(adjust_path("/proc"), pid, "status")
-        user, command, state, vsz, rss = "unknown", "unknown", "S", 0, 0
+        user, command, state, threads, vsz, rss = "unknown", "unknown", "S", 0, 0, 0
         with open(status_path, "r") as f:
             for line in f:
                 if line.startswith("Name:"):
@@ -290,11 +308,13 @@ def _parse_process_status(pid):
                     user = get_username_from_uid(uid)
                 elif line.startswith("State"):
                     state = line.split()[1]
-                elif line.startswith("VmSize:"):
+                elif line.startswith("Threads:"):
+                    threads = line.split()[1]
+                elif line.startswith("VmSize:"): # (Virtual Memory Size)
                     vsz = int(line.split()[1])
-                elif line.startswith("VmRSS:"):
+                elif line.startswith("VmRSS:"): # (Resident Set Size)
                     rss = int(line.split()[1])
-        return (user, pid, state, format_memory(vsz), format_memory(rss), command)
+        return (user, pid, state, threads, format_memory(vsz), format_memory(rss), command)
     except (FileNotFoundError, KeyError):
         return None
 
@@ -325,6 +345,44 @@ def _read_process_status(pid):
     status_path = adjust_path(f"/proc/{pid}/status")
     with open(status_path, "r") as f:
         return f.read()
+    
+def _read_process_tasks(pid):
+    tasks_path = adjust_path(f"/proc/{pid}/task")
+
+    # Verificar se o diretório existe
+    if not os.path.exists(tasks_path):
+        raise FileNotFoundError(f"Process with PID {pid} not found.")
+
+    tasks_data = []
+
+    # Iterar sobre cada thread (task) no diretório
+    for tid in os.listdir(tasks_path):
+        if tid.isdigit():
+            task_info = {}
+            task_path_info = os.path.join(tasks_path, tid)
+
+            try:
+                # Ler informações básicas da thread
+                with open(os.path.join(task_path_info, "status"), "r") as f:
+                    status_lines = f.readlines()
+                    for line in status_lines:
+                        key, *value = line.split(":")
+                        if key and value:
+                            task_info[key.strip()] = ":".join(value).strip()
+
+                # Adicionar o TID às informações
+                task_info["tid"] = int(tid)
+
+                # Adicionar informações da thread à lista
+                tasks_data.append(task_info)
+
+            except FileNotFoundError:
+                # Ignorar threads que podem ter terminado durante a leitura
+                continue
+
+    # Retorna a lista com informações de todas as threads
+    return tasks_data
+
 
 def _get_user_from_status(status):
     """

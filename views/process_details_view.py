@@ -2,9 +2,10 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import traceback
-from models import SystemInfo
+from models import ProcessDetails
 from services import (
     fetch_process_details,
+    fetch_process_tasks,
 )
 from services.system_info_service import format_memory
 from concurrent.futures import ThreadPoolExecutor
@@ -34,15 +35,47 @@ class ProcessDetailsWindow(tk.Toplevel):
         self.data_lock = threading.Lock()  # Lock para exclusão mútua
         self.executor = ThreadPoolExecutor(max_workers=2)  # Executor para gerenciar a concorrência
         self.details = {}
+        self.tasks = {}
 
         try:
-            self.details_label = ttk.Label(self, text=f"Details for Process {pid}:", font=("Arial", 12, "bold"))
-            self.details_label.pack(anchor="w", padx=10, pady=5)
+            # Configuração do layout principal
+            self.main_frame = ttk.Frame(self)
+            self.main_frame.grid(row=0, column=0, sticky="nsew")
+            self.rowconfigure(0, weight=1)
+            self.columnconfigure(0, weight=1)
 
-            # Text widget for displaying process details, set to not editable
-            self.details_text = tk.Text(self, wrap="word", state="disabled")  # Start with disabled state
+            # Primeira seção: Detalhes do processo
+            process_details_frame = ttk.LabelFrame(self.main_frame, text="Process Details", padding="10")
+            process_details_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+
+            # Label para detalhes do processo
+            self.details_text = tk.Text(process_details_frame, wrap="word", state="disabled", height=10)
             self.details_text.pack(fill="both", expand=True, padx=10, pady=5)
 
+            # Segunda seção: Tabela com threads (tasks)
+            tasks_frame = ttk.LabelFrame(self.main_frame, text="Threads (Tasks)", padding="10")
+            tasks_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+
+            # Configuração do Treeview para threads
+            columns = ("Pid", "Name", "State", "VmSize", "VmRSS", "VmExe")
+            self.tasks_table = ttk.Treeview(tasks_frame, columns=columns, show="headings", height=15)
+            self.tasks_table.pack(fill="both", expand=True)
+
+            # Configurando as colunas do Treeview
+            for col in columns:
+                self.tasks_table.heading(col, text=col.capitalize(), anchor="center")
+                self.tasks_table.column(col, width=150, anchor="center")
+
+            # Scrollbar vertical para o Treeview
+            scrollbar = ttk.Scrollbar(tasks_frame, orient="vertical", command=self.tasks_table.yview)
+            self.tasks_table.config(yscrollcommand=scrollbar.set)
+            scrollbar.pack(side="right", fill="y")
+
+            # Ajustando o layout responsivo
+            self.main_frame.rowconfigure(0, weight=1)  # Primeira seção
+            self.main_frame.rowconfigure(1, weight=2)  # Segunda seção
+
+            # Carregar dados iniciais
             self.refresh_data()
         except Exception:
             print(f"ProcessDetailsWindow - __init__: Erro ao inicializar a janela de detalhes para PID {pid}")
@@ -59,8 +92,8 @@ class ProcessDetailsWindow(tk.Toplevel):
                 if not self.details:
                     return
                 
-            useful_keys = ["Name", "State", "Pid", "PPid", "Threads", "VmRSS", "VmSize", "User"]
-
+            useful_keys = ["User", "Name", "State", "Pid", "PPid", "VmSize", "VmRSS", "VmPeak", "Threads"]
+            
             # Temporariamente habilita o widget para edição e limpa o conteúdo anterior
             self.details_text.config(state="normal")
             self.details_text.delete("1.0", tk.END)
@@ -72,6 +105,22 @@ class ProcessDetailsWindow(tk.Toplevel):
                     if key in ["VmSize", "VmRSS"] and value.split()[0].isdigit():
                         value = format_memory(int(value.split()[0]))
                     self.details_text.insert(tk.END, f"{key}: {value}\n")
+                    
+            # Atualização do Treeview
+            self.tasks_table.delete(*self.tasks_table.get_children())
+            for task in self.tasks:
+                self.tasks_table.insert(
+                    "",
+                    "end",
+                    values=(
+                        task.get("Pid", ""),
+                        task.get("Name", ""),
+                        task.get("State", ""),
+                        format_memory(int(task.get("VmSize", 0).split()[0])),
+                        format_memory(int(task.get("VmRSS", 0).split()[0])),
+                        format_memory(int(task.get("VmExe", 0).split()[0])),
+                    ),
+                )
 
             # Desabilita o widget para evitar edições
             self.details_text.config(state="disabled")
@@ -87,19 +136,26 @@ class ProcessDetailsWindow(tk.Toplevel):
         """
         try:
             #details = fetch_process_details(self.pid)            
-            future = self.executor.submit(fetch_process_details, self.pid)
+            tasks = [
+                self.executor.submit(fetch_process_details, self.pid),
+                self.executor.submit(fetch_process_tasks, self.pid)
+            ]
 
-             # Aguarda a conclusão da tarefa e obtém o resultado
-            details = future.result()
+            # Aguarda a conclusão da tarefa e obtém o resultado
+            details = tasks[0].result()
+            process_tasks = tasks[1].result()    
+            
 
             with self.data_lock:
                 self.details = details
+                self.tasks = process_tasks
                 self.data_ready = True # Sinaliza que os dados foram buscados
         except Exception:
             print(f"ProcessDetailsWindow - fetch_details: Erro ao buscar detalhes do processo PID {self.pid}")
             traceback.print_exc()
             with self.data_lock:
                 self.details = {}
+                self.tasks = {}
                 self.data_ready = True
     def refresh_data(self):
         """

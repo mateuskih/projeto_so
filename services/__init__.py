@@ -14,6 +14,7 @@ from .system_info_service import (
     fetch_active_processes,
     fetch_os_info,
     fetch_process_details,
+    fetch_process_tasks,
     adjust_path,
     format_memory,
     get_username_from_uid

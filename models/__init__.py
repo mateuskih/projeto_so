@@ -11,3 +11,4 @@ Exporta:
 """
 
 from .system_info_model import SystemInfo
+from .process_details_model import ProcessDetails

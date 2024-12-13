@@ -150,7 +150,7 @@ class DashboardApp(tk.Tk):
         processes_frame.rowconfigure(0, weight=1)
         processes_frame.columnconfigure(0, weight=1)
 
-        columns = ("user", "pid", "state", "vsz", "rss", "command")
+        columns = ("user", "pid", "state", "Threads", "VmSize", "VmRSS", "command")
         self.process_info = ttk.Treeview(processes_frame, columns=columns, show="headings", height=15)
         self.process_info.grid(row=0, column=0, sticky="nsew")
 
