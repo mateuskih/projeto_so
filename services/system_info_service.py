@@ -4,7 +4,7 @@ import traceback
 
 from models.process_details_model import ProcessDetails
 
-WSL_PATH = r"\\wsl.localhost\Ubuntu-20.04"
+WSL_PATH = r"\\wsl.localhost\Ubuntu-22.04"
 
 
 def fetch_cpu_info(dados):
