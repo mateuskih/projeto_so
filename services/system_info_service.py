@@ -502,3 +502,160 @@ def get_username_from_uid(uid):
         print(f"system_info_service - get_username_from_uid: Erro ao abrir arquivo {path}")
         traceback.print_exc()
     return "unknown"
+
+def fetch_filesystem_info():
+    """
+    Coleta informações sobre o sistema de arquivos lendo /proc/mounts e utilizando os dados de os.statvfs.
+    
+    Retorno:
+        list: Lista de dicionários com informações de cada partição:
+            - device: dispositivo (ex: /dev/sda1)
+            - mountpoint: ponto de montagem (ex: /)
+            - fstype: tipo do sistema de arquivos
+            - total: tamanho total da partição (em KB)
+            - used: espaço utilizado (em KB)
+            - free: espaço livre (em KB)
+            - percent: percentual de uso
+    """
+    partitions = []
+    try:
+        mounts_path = adjust_path("/proc/mounts")
+        with open(mounts_path, "r") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 3:
+                    continue
+                device, mountpoint, fstype = parts[0], parts[1], parts[2]
+                try:
+                    stats = os.statvfs(mountpoint)
+                    total = (stats.f_blocks * stats.f_frsize) // 1024
+                    free = (stats.f_bfree * stats.f_frsize) // 1024
+                    used = total - free
+                    percent = (used / total) * 100 if total > 0 else 0
+                    partitions.append({
+                        "device": device,
+                        "mountpoint": mountpoint,
+                        "fstype": fstype,
+                        "total": total,
+                        "used": used,
+                        "free": free,
+                        "percent": round(percent, 2)
+                    })
+                except Exception:
+                    continue
+    except Exception as e:
+        print(f"Erro ao ler /proc/mounts: {e}")
+        traceback.print_exc()
+    return partitions
+
+
+def fetch_directory_info(path):
+    """
+    Lista os arquivos e diretórios contidos no caminho especificado.
+    
+    Parâmetros:
+        path (str): Caminho do diretório.
+        
+    Retorno:
+        list: Lista de dicionários com informações de cada entrada:
+            - name: nome do arquivo/diretório.
+            - is_dir: True se for diretório, False caso contrário.
+            - size: tamanho do arquivo (em bytes).
+            - permissions: permissões do arquivo (ex: "755").
+            - last_modified: timestamp da última modificação.
+            - last_accessed: timestamp do último acesso.
+            - metadata_change: timestamp da última alteração dos metadados.
+            - owner: nome do usuário proprietário do arquivo.
+            - inode: número do inode.
+    """
+    entries_info = []
+    try:
+        for entry in os.listdir(path):
+            full_path = os.path.join(path, entry)
+            try:
+                stats = os.stat(full_path)
+                entries_info.append({
+                    "name": entry,
+                    "is_dir": os.path.isdir(full_path),
+                    "size": stats.st_size,
+                    "permissions": oct(stats.st_mode)[-3:],
+                    "last_modified": stats.st_mtime,
+                    "last_accessed": stats.st_atime,
+                    "metadata_change": stats.st_ctime,
+                    "owner": get_username_from_uid(stats.st_uid),
+                    "inode": stats.st_ino
+                })
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"Erro ao listar o diretório {path}: {e}")
+        traceback.print_exc()
+    return entries_info
+
+def fetch_io_info(pid):
+    """
+    Coleta informações de entrada/saída de um processo específico a partir do arquivo /proc/[pid]/io.
+    
+    Parâmetros:
+        pid (str ou int): ID do processo.
+        
+    Retorno:
+        dict: Dicionário com as informações de I/O (ex.: rchar, wchar, read_bytes, write_bytes).
+    """
+    io_info = {}
+    try:
+        io_path = adjust_path(f"/proc/{pid}/io")
+        with open(io_path, "r") as f:
+            for line in f:
+                key, value = line.split(":")
+                io_info[key.strip()] = value.strip()
+    except Exception as e:
+        print(f"Erro ao ler I/O do processo {pid}: {e}")
+        traceback.print_exc()
+    return io_info
+
+import os
+import stat
+import traceback
+from services.system_info_service import adjust_path  # Certifique-se de que adjust_path está disponível
+
+def fetch_process_resources(pid):
+    """
+    Coleta informações detalhadas dos recursos abertos/alocados pelo processo.
+    Lê o diretório /proc/<pid>/fd e retorna uma lista de dicionários com:
+      - fd: número do file descriptor.
+      - target: destino do link (arquivo, socket, pipe, etc.).
+      - inode: número do inode do arquivo apontado.
+      - mode: modo do arquivo formatado (ex: "-rw-r--r--").
+      - size: tamanho do arquivo (em bytes).
+      - last_modified: timestamp da última modificação (st_mtime).
+    """
+    resources = []
+    try:
+        fd_dir = adjust_path(f"/proc/{pid}/fd")
+        for fd in os.listdir(fd_dir):
+            fd_path = os.path.join(fd_dir, fd)
+            try:
+                target = os.readlink(fd_path)
+            except Exception:
+                target = "N/A"
+            try:
+                info = os.lstat(fd_path)
+                inode = info.st_ino
+                mode = stat.filemode(info.st_mode)
+                size = info.st_size
+                last_modified = info.st_mtime
+            except Exception:
+                inode = mode = size = last_modified = "N/A"
+            resources.append({
+                "fd": fd,
+                "target": target,
+                "inode": inode,
+                "mode": mode,
+                "size": size,
+                "last_modified": last_modified
+            })
+    except Exception as e:
+        print(f"Erro ao coletar recursos abertos para PID {pid}: {e}")
+        traceback.print_exc()
+    return resources
