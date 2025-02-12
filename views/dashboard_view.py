@@ -6,6 +6,8 @@ from models.system_info_model import SystemInfo
 from services.system_info_service import fetch_active_processes, fetch_cpu_info, fetch_memory_info, fetch_os_info
 from .process_details_view import ProcessDetailsWindow
 from concurrent.futures import ThreadPoolExecutor
+from .filesystem_view import FilesystemFrame
+
 
 class DashboardApp(tk.Tk):
     """
@@ -92,77 +94,86 @@ class DashboardApp(tk.Tk):
 
     def create_scrollable_content(self):
         """
-        Adiciona o conteúdo ao frame rolável.
-
-        Este método cria frames para exibir informações do sistema, CPU, memória e processos ativos.
+        Cria o conteúdo do frame rolável utilizando um Notebook com duas abas:
+        - Aba "Dashboard": Contém as informações do sistema (OS, CPU, Memória, Processos, etc.).
+        - Aba "Sistemas de Arquivos": Renderiza diretamente a interface do file system.
         """
+        # Cria o Notebook e o posiciona no frame rolável
+        notebook = ttk.Notebook(self.scrollable_frame)
+        notebook.grid(row=0, column=0, sticky="nsew")
 
-        main_frame = ttk.Frame(self.scrollable_frame, padding="10")
-        main_frame.grid(row=0, column=0, sticky="nsew")
+        # -----------------------------
+        # Aba 1: Dashboard
+        # -----------------------------
+        dashboard_tab = ttk.Frame(notebook, padding="10")
+        notebook.add(dashboard_tab, text="Dashboard")
 
         # OS Information
-        os_frame = ttk.LabelFrame(main_frame, text="Operating System Information", padding="10")
+        os_frame = ttk.LabelFrame(dashboard_tab, text="Operating System Information", padding="10")
         os_frame.grid(row=0, column=0, padx=10, pady=10, sticky="new")
         self.os_info = ttk.Label(os_frame, text="", anchor="w", justify="left", padding="5")
         self.os_info.grid(row=0, column=0, sticky="w")
 
         # CPU Information
-        cpu_frame = ttk.LabelFrame(main_frame, text="CPU Information", padding="10")
-        cpu_frame.grid(row=1, column=0, padx=5, pady=10, sticky="w")
+        cpu_frame = ttk.LabelFrame(dashboard_tab, text="CPU Information", padding="10")
+        cpu_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
         self.cpu_info = ttk.Label(cpu_frame, text="", anchor="w", justify="left", padding="5")
         self.cpu_info.grid(row=0, column=0, sticky="w")
-
-        # Canvas para gráfico de CPU
-        self.cpu_canvas = tk.Canvas(cpu_frame, bg="white")  # Remova largura fixa
-        self.cpu_canvas.grid(row=1, column=0, pady=5, sticky="nsew")  # Adicione sticky
-        cpu_frame.rowconfigure(1, weight=1)  # Torna o gráfico responsivo
+        self.cpu_canvas = tk.Canvas(cpu_frame, bg="white", height=100)
+        self.cpu_canvas.grid(row=1, column=0, pady=5, sticky="ew")
         cpu_frame.columnconfigure(0, weight=1)
-
-        # Adicionando legendas ao gráfico de CPU
         self.cpu_label_top = tk.Label(cpu_frame, text="100%", anchor="e")
         self.cpu_label_top.grid(row=1, column=1, padx=5, sticky="n")
-
         self.cpu_label_bottom = tk.Label(cpu_frame, text="0", anchor="e")
         self.cpu_label_bottom.grid(row=1, column=1, padx=5, sticky="s")
 
         # Memory Information
-        memory_frame = ttk.LabelFrame(main_frame, text="Memory Information", padding="10")
-        memory_frame.grid(row=1, column=0, padx=5, pady=10, sticky="e")
+        memory_frame = ttk.LabelFrame(dashboard_tab, text="Memory Information", padding="10")
+        memory_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
         self.memory_info = ttk.Label(memory_frame, text="", anchor="w", justify="left", padding="5")
         self.memory_info.grid(row=0, column=0, sticky="w")
-
-        # Canvas para gráfico de memória
-        self.memory_canvas = tk.Canvas(memory_frame, bg="white")  # Remova largura fixa
-        self.memory_canvas.grid(row=1, column=0, pady=5, sticky="nsew")  # Adicione sticky
-        memory_frame.rowconfigure(1, weight=1)  # Torna o gráfico responsivo
+        self.memory_canvas = tk.Canvas(memory_frame, bg="white", height=100)
+        self.memory_canvas.grid(row=1, column=0, pady=5, sticky="ew")
         memory_frame.columnconfigure(0, weight=1)
-
-        # Adicionando legendas ao gráfico de memória
         self.memory_label_top = tk.Label(memory_frame, text="100%", anchor="e")
         self.memory_label_top.grid(row=1, column=1, padx=5, sticky="n")
-
         self.memory_label_bottom = tk.Label(memory_frame, text="0", anchor="e")
         self.memory_label_bottom.grid(row=1, column=1, padx=5, sticky="s")
 
-        # Canvas para os processos
-        processes_frame = ttk.LabelFrame(main_frame, text="Active Processes", padding="10")
-        processes_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        # Active Processes
+        processes_frame = ttk.LabelFrame(dashboard_tab, text="Active Processes", padding="10")
+        processes_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
         processes_frame.rowconfigure(0, weight=1)
         processes_frame.columnconfigure(0, weight=1)
-
         columns = ("user", "pid", "state", "Threads", "VmSize", "VmRSS", "command")
         self.process_info = ttk.Treeview(processes_frame, columns=columns, show="headings", height=15)
         self.process_info.grid(row=0, column=0, sticky="nsew")
-
         for col in columns:
             self.process_info.heading(col, text=col.capitalize(), anchor="center")
             self.process_info.column(col, width=150, anchor="center")
-
         scrollbar = ttk.Scrollbar(processes_frame, orient="vertical", command=self.process_info.yview)
         self.process_info.config(yscrollcommand=scrollbar.set)
         scrollbar.grid(row=0, column=1, sticky="ns")
-
         self.process_info.bind("<Double-1>", self.show_process_details)
+
+        # Configura o layout da aba Dashboard para expandir
+        dashboard_tab.columnconfigure(0, weight=1)
+        dashboard_tab.rowconfigure(3, weight=1)
+
+        # -----------------------------
+        # Aba 2: Sistemas de Arquivos
+        # -----------------------------
+        filesystem_tab = ttk.Frame(notebook, padding="10")
+        notebook.add(filesystem_tab, text="Sistemas de Arquivos")
+
+        # Renderiza diretamente a interface do file system na aba
+        fs_frame = FilesystemFrame(filesystem_tab, start_path="/")
+        fs_frame.pack(fill="both", expand=True)
+
+        # Expande o Notebook no frame rolável
+        self.scrollable_frame.columnconfigure(0, weight=1)
+        self.scrollable_frame.rowconfigure(0, weight=1)
+
 
 
     def update_display(self):
@@ -332,3 +343,9 @@ class DashboardApp(tk.Tk):
         except Exception:
             print("Dashboard - show_process_details: Erro ao exibir detalhes do processo")
             traceback.print_exc()
+
+    def open_filesystem_window(self):
+        """
+        Abre a janela de Sistema de Arquivos.
+        """
+        FilesystemFrame(self)

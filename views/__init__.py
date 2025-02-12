@@ -13,3 +13,4 @@ Classes:
 """
 from .dashboard_view import DashboardApp
 from .process_details_view import ProcessDetailsWindow
+from .filesystem_view import FilesystemFrame
