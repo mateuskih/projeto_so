@@ -1,3 +1,4 @@
+from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 import threading
@@ -7,9 +8,11 @@ from services.system_info_service import (
     fetch_process_details,
     fetch_process_tasks,
     fetch_io_info,
-    fetch_process_resources  # nova função
+    fetch_process_resources
 )
 from concurrent.futures import ThreadPoolExecutor
+
+from views.filesystem_view import format_size
 
 class ProcessDetailsWindow(tk.Toplevel):
     """
@@ -65,14 +68,13 @@ class ProcessDetailsWindow(tk.Toplevel):
 
         # Conteúdo da aba "Recursos"
         # Treeview para exibir os recursos abertos pelo processo
-        columns_res = ("FD", "Target", "Inode", "Mode", "Size", "Last Modified")
+        columns_res = ("FD", "Target", "Inode", "Size", "Last Modified")
         self.resources_table = ttk.Treeview(self.resources_frame, columns=columns_res, show="headings", height=15)
 
         # Configura os cabeçalhos de cada coluna
         self.resources_table.heading("FD", text="FD")
         self.resources_table.heading("Target", text="Target")
         self.resources_table.heading("Inode", text="Inode")
-        self.resources_table.heading("Mode", text="Mode")
         self.resources_table.heading("Size", text="Size")
         self.resources_table.heading("Last Modified", text="Last Modified")
 
@@ -80,7 +82,6 @@ class ProcessDetailsWindow(tk.Toplevel):
         self.resources_table.column("FD", width=50, anchor="center")
         self.resources_table.column("Target", width=300, anchor="w")
         self.resources_table.column("Inode", width=100, anchor="center")
-        self.resources_table.column("Mode", width=100, anchor="center")
         self.resources_table.column("Size", width=100, anchor="center")
         self.resources_table.column("Last Modified", width=150, anchor="center")
 
@@ -154,6 +155,10 @@ class ProcessDetailsWindow(tk.Toplevel):
             for res in self.resources:
                 self.resources_table.insert("", "end", values=(
                     res["fd"],
+                    res["target"],
+                    res["inode"],
+                    format_size(res["size"]),
+                    datetime.fromtimestamp(res["last_modified"]).strftime("%d/%m/%Y %H:%M:%S"),
                     res["target"]
                 ))
         except Exception:
@@ -168,7 +173,7 @@ class ProcessDetailsWindow(tk.Toplevel):
             tasks_list = [
                 self.executor.submit(fetch_process_details, self.pid, self.details),
                 self.executor.submit(fetch_process_tasks, self.pid, self.tasks),
-                self.executor.submit(fetch_process_resources, self.pid)  # nova tarefa para recursos
+                self.executor.submit(fetch_process_resources, self.pid)
             ]
             # Aguarda os resultados; se a tarefa de recursos retornar um valor, atualiza self.resources
             for task in tasks_list:

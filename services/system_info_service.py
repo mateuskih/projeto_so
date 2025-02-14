@@ -607,7 +607,6 @@ def fetch_process_resources(pid):
       - fd: número do file descriptor.
       - target: destino do link (arquivo, socket, pipe, etc.).
       - inode: número do inode do arquivo apontado.
-      - mode: modo do arquivo formatado (ex: "-rw-r--r--").
       - size: tamanho do arquivo (em bytes).
       - last_modified: timestamp da última modificação (st_mtime).
     """
@@ -623,16 +622,14 @@ def fetch_process_resources(pid):
             try:
                 info = os.lstat(fd_path)
                 inode = info.st_ino
-                mode = stat.filemode(info.st_mode)
                 size = info.st_size
                 last_modified = info.st_mtime
             except Exception:
-                inode = mode = size = last_modified = "N/A"
+                inode = size = last_modified = "N/A"
             resources.append({
                 "fd": fd,
                 "target": target,
                 "inode": inode,
-                "mode": mode,
                 "size": size,
                 "last_modified": last_modified
             })
